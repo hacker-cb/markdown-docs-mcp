@@ -45,6 +45,22 @@ Add to `~/.claude/settings.json`, project `.mcp.json`, Cursor settings, Continue
 }
 ```
 
+## Example prompt
+
+Once installed, point the agent at a large markdown file and ask anything:
+
+```
+Explain me peripherals of @tests/fixtures/public/esp32-p4-trm.md
+```
+
+The agent will call `view_toc` to skim the 143k-line manual, drill into
+relevant sections via `read_section`, and answer from a focused subset —
+without ever loading the full file into its context.
+
+The `@<path>` syntax is Claude Code's file-attachment shortcut. In Cursor /
+Continue / other MCP clients, pass the absolute or workspace-relative path as
+plain text instead.
+
 ### Configuration
 
 Two optional env vars override response caps (see `src/config.ts`):
