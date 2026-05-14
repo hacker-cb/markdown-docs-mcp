@@ -7,19 +7,15 @@ import { parsePdfPageMarkers } from "../parser/pdf_pages.js";
 import { computeLineOffsets } from "../parser/_line_offsets.js";
 import { buildTocTree } from "./reparenting.js";
 import { detectAnomalies } from "../anomalies/detector.js";
-import type { FlatSeed, Index, TocNode } from "./types.js";
+import {
+  buildNodeById,
+  buildFlatIndexById,
+  buildLineSectionMap,
+} from "./maps.js";
+import type { FlatSeed, Index } from "./types.js";
 
 function stripBOM(s: string): string {
   return s.length > 0 && s.charCodeAt(0) === 0xfeff ? s.slice(1) : s;
-}
-
-function findNodeById(nodes: TocNode[], id: string): TocNode | undefined {
-  for (const node of nodes) {
-    if (node.id === id) return node;
-    const found = findNodeById(node.children, id);
-    if (found) return found;
-  }
-  return undefined;
 }
 
 export async function buildIndex(filePath: string): Promise<Index> {
@@ -53,6 +49,11 @@ export async function buildIndex(filePath: string): Promise<Index> {
   // Step 1: parse PDF page markers (needed for adjacent_pdf_markers in anomaly detection)
   const pdf_markers = parsePdfPageMarkers(raw, line_offsets);
 
+  // Build O(1) lookup maps once — consumed by response builders and detector.
+  const node_by_id = buildNodeById(toc);
+  const flat_index_by_id = buildFlatIndexById(flat);
+  const line_section_map = buildLineSectionMap(toc, line_count);
+
   // Step 2: build a temp index to run anomaly detection
   const tempIndex: Index = {
     file_path: filePath,
@@ -67,6 +68,9 @@ export async function buildIndex(filePath: string): Promise<Index> {
     frontmatter: fm.data,
     anomalies: [],
     pdf_markers,
+    node_by_id,
+    flat_index_by_id,
+    line_section_map,
   };
 
   const anomalies = detectAnomalies(tempIndex);
@@ -77,7 +81,7 @@ export async function buildIndex(filePath: string): Promise<Index> {
       anomaly.type === "self_nesting_header" ||
       anomaly.type === "consecutive_pair_header"
     ) {
-      const node = findNodeById(toc, anomaly.node_id);
+      const node = node_by_id.get(anomaly.node_id);
       if (node) {
         node.is_likely_artifact = true;
         if (anomaly.type === "self_nesting_header") {
@@ -96,17 +100,7 @@ export async function buildIndex(filePath: string): Promise<Index> {
   }
 
   return {
-    file_path: filePath,
-    size_bytes: stats.size,
-    mtime_ms: stats.mtimeMs,
-    line_count,
-    raw_content: raw,
-    line_offsets,
-    toc,
-    flat_headers: flat,
-    comment_ranges,
-    frontmatter: fm.data,
+    ...tempIndex,
     anomalies,
-    pdf_markers,
   };
 }

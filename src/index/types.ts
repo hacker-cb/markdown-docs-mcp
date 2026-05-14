@@ -1,6 +1,7 @@
 import type { CommentRange } from "../parser/comments.js";
 import type { Anomaly } from "../anomalies/types.js";
 import type { PdfMarker } from "../parser/pdf_pages.js";
+import type { SectionInfo } from "./maps.js";
 
 export type TocNode = {
   id: string;                  // "s<line>"
@@ -10,7 +11,7 @@ export type TocNode = {
   line: number;
   line_end: number;
   section_lines: number;
-  is_likely_artifact: boolean; // false by default; set to true by detector for self_nesting
+  is_likely_artifact: boolean;
   artifact_reason?: string;
   children: TocNode[];
 };
@@ -40,13 +41,17 @@ export type Index = {
   mtime_ms: number;
   line_count: number;
   raw_content: string;
-  line_offsets: number[];     // line (1-based) -> char offset; lineOffsets[i-1] = start of line i
-  toc: TocNode[];             // root nodes
+  line_offsets: number[];
+  toc: TocNode[];
   flat_headers: FlatHeader[];
   comment_ranges: CommentRange[];
   frontmatter: Record<string, unknown> | undefined;
   anomalies: Anomaly[];
   pdf_markers: PdfMarker[];
+  // O(1) lookups built once in buildIndex; consumed by response builders + detector.
+  node_by_id: ReadonlyMap<string, TocNode>;
+  flat_index_by_id: ReadonlyMap<string, number>;
+  line_section_map: ReadonlyArray<SectionInfo | null>;
 };
 
-export type { CommentRange, PdfMarker, Anomaly };
+export type { CommentRange, PdfMarker, Anomaly, SectionInfo };
