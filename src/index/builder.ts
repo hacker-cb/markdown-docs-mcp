@@ -82,7 +82,7 @@ export async function buildIndex(filePath: string): Promise<Index> {
   });
 
   // Step 1: parse PDF page markers (needed for adjacent_pdf_markers in anomaly detection)
-  const pdf_markers = parsePdfPageMarkers(raw);
+  const pdf_markers = parsePdfPageMarkers(raw, line_offsets);
 
   // Step 2: build a temp index to run anomaly detection
   const tempIndex: Index = {
