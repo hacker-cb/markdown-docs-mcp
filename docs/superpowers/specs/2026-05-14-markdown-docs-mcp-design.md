@@ -480,7 +480,7 @@ Description пишется на английском (in-repo English convention
 ### 10.1 Build
 
 - Single-file bundle через esbuild: `src/index.ts` -> `dist/index.js`. Bundle включает markdown-it и другие deps.
-- target: `node18` (LTS).
+- target: `node20` (LTS) — node18 вышел из active LTS в апреле 2025; обновление зафиксировано в PR-01.
 - `dist/` gitignored. Собирается в CI перед npm publish и перед запуском integration-тестов.
 
 ### 10.2 GitHub Actions
@@ -596,7 +596,7 @@ markdown-docs-mcp/
 
 Декомпозиция работы на серию PR. Статус каждого PR трекается чекбоксом — отмечается в финальном коммите каждого PR перед merge'ом. Per-PR планы живут отдельно в `docs/superpowers/plans/<date>-pr-NN-<slug>.md` (по `working-on-large-tasks` skill).
 
-- [ ] **PR-01: Bootstrap** — `package.json`, `tsconfig.json`, esbuild config, vitest config, GitHub Actions test workflow, LICENSE, README skeleton, public fixtures (`esp32-p4-datasheet.md`, `stm32h750ib.md`). Без логики MCP.
+- [x] **PR-01: Bootstrap** — `package.json`, `tsconfig.json`, esbuild config, vitest config, GitHub Actions test workflow, LICENSE, README skeleton, public fixtures (`esp32-p4-datasheet.md`, `stm32h750ib.md`). Без логики MCP.
 
 - [ ] **PR-02: MCP server skeleton** — stdio entry (`src/index.ts`), Zod schemas (`src/schemas/`), регистрация четырёх tools через стандартный `tools/list`. Tools возвращают `not_implemented` error до своей очереди. Базовый JSON-RPC integration test (handshake + список tools).
 

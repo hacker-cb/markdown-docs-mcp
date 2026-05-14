@@ -1,0 +1,50 @@
+{
+  "name": "markdown-docs-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for efficient navigation of large markdown documents (datasheets, standards, manuals)",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "markdown-docs-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "markdown",
+    "documentation",
+    "datasheet"
+  ],
+  "author": "hacker-cb",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hacker-cb/markdown-docs-mcp.git"
+  },
+  "homepage": "https://github.com/hacker-cb/markdown-docs-mcp",
+  "bugs": {
+    "url": "https://github.com/hacker-cb/markdown-docs-mcp/issues"
+  },
+  "devDependencies": {
+    "@types/node": "25.7.0",
+    "esbuild": "0.28.0",
+    "tsx": "4.21.0",
+    "typescript": "6.0.3",
+    "vitest": "4.1.6"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  }
+}
