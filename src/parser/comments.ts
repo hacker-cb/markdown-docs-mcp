@@ -1,4 +1,5 @@
 import MarkdownIt from "markdown-it";
+import { lineOfOffsetBinary } from "./_line_offsets.js";
 
 export type CommentRange = {
   start_line: number;
@@ -7,15 +8,9 @@ export type CommentRange = {
 
 const md = new MarkdownIt({ html: true });
 
-function lineOfOffset(content: string, offset: number): number {
-  let line = 1;
-  for (let i = 0; i < offset; i++) {
-    if (content.charCodeAt(i) === 10 /* \n */) line++;
-  }
-  return line;
-}
-
-function getCodeBlockRanges(content: string): Array<{ start: number; end: number }> {
+function getCodeBlockRanges(
+  content: string
+): Array<{ start: number; end: number }> {
   const tokens = md.parse(content, {});
   const ranges: Array<{ start: number; end: number }> = [];
   for (const tok of tokens) {
@@ -28,14 +23,20 @@ function getCodeBlockRanges(content: string): Array<{ start: number; end: number
   return ranges;
 }
 
-export function findCommentRanges(content: string): CommentRange[] {
+export function findCommentRanges(
+  content: string,
+  lineOffsets: number[]
+): CommentRange[] {
   const codeRanges = getCodeBlockRanges(content);
   const re = /<!--[\s\S]*?-->/g;
   const result: CommentRange[] = [];
   let match: RegExpExecArray | null;
   while ((match = re.exec(content)) !== null) {
-    const start_line = lineOfOffset(content, match.index);
-    const end_line = lineOfOffset(content, match.index + match[0].length - 1);
+    const start_line = lineOfOffsetBinary(lineOffsets, match.index);
+    const end_line = lineOfOffsetBinary(
+      lineOffsets,
+      match.index + match[0].length - 1
+    );
     const insideCode = codeRanges.some(
       (cr) => start_line >= cr.start && end_line <= cr.end
     );

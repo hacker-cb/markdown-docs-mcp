@@ -50,7 +50,7 @@ export async function buildIndex(filePath: string): Promise<Index> {
     };
   });
 
-  const comment_ranges = findCommentRanges(raw);
+  const comment_ranges = findCommentRanges(raw, line_offsets);
   const toc = buildTocTree(flatSeeds, line_count);
 
   // Walk the tree in document order, collecting line_end / section_lines.
