@@ -1,0 +1,88 @@
+name: release
+
+# Fires when a release tag is pushed to master. Use scripts/release.mjs locally
+# to produce the four-file version bump + tag; this workflow takes it from
+# there: re-run the full test matrix, build, then publish to npm via Trusted
+# Publisher (OIDC, no NPM_TOKEN secret) and create a GitHub Release.
+
+on:
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: publish to npm + GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write   # softprops/action-gh-release writes the release
+      id-token: write   # npm OIDC for Trusted Publisher
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify tag matches the four-file version invariant
+        # Defends against pushing a `v*` tag from a commit where scripts/release.mjs
+        # wasn't run (or was run with a different version). Without this guard,
+        # `npm publish` would happily ship whatever version package.json contains
+        # under a tag/release name that doesn't match.
+        run: |
+          set -euo pipefail
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          echo "Tag: ${GITHUB_REF_NAME} → expected version ${TAG_VERSION}"
+          node -e '
+            const fs = require("fs");
+            const expected = process.argv[1];
+            const sources = {
+              "package.json": JSON.parse(fs.readFileSync("package.json", "utf8")).version,
+              ".claude-plugin/plugin.json": JSON.parse(fs.readFileSync(".claude-plugin/plugin.json", "utf8")).version,
+              ".claude-plugin/marketplace.json": JSON.parse(fs.readFileSync(".claude-plugin/marketplace.json", "utf8")).plugins[0].version,
+              ".mcp.json": (JSON.parse(fs.readFileSync(".mcp.json", "utf8")).mcpServers["markdown-docs"].args.find(a => typeof a === "string" && a.startsWith("markdown-docs-mcp@")) || "").split("@")[1],
+            };
+            const bad = Object.entries(sources).filter(([, v]) => v !== expected);
+            if (bad.length > 0) {
+              console.error(`Tag ${process.argv[1]} does not match all version sources:`);
+              for (const [f, v] of Object.entries(sources)) console.error(`  ${f}: ${v}`);
+              process.exit(1);
+            }
+            console.log(`All four files agree on version ${expected}.`);
+          ' "${TAG_VERSION}"
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Publish to npm (OIDC / Trusted Publisher)
+        # --provenance signs the publish with the GitHub workflow's identity,
+        # which npmjs.com shows as a verified provenance badge.
+        # Trusted Publisher must be configured on npmjs.com (Account → Trusted
+        # Publishers → add this repo + workflow file) before the first publish.
+        run: npm publish --provenance --access public
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
