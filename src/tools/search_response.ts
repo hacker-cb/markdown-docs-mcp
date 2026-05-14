@@ -1,4 +1,4 @@
-import type { Index, TocNode } from "../index/types.js";
+import type { Index } from "../index/types.js";
 import type { SearchInput } from "../schemas/inputs.js";
 
 export type SearchHit = {
@@ -27,54 +27,6 @@ const PREAMBLE_SECTION = {
   level: 0,
   numbering: null,
 } as const;
-
-// ---------------------------------------------------------------------------
-// Line → section map
-// ---------------------------------------------------------------------------
-
-type SectionInfo = {
-  id: string;
-  title: string;
-  level: number;
-  numbering: string | null;
-};
-
-/**
- * Builds a flat array mapping line number (1-based) → deepest containing section.
- * Lines before the first header map to the preamble sentinel (null).
- * The array is indexed by (line - 1) for O(1) lookup.
- */
-function buildLineSectionMap(toc: TocNode[], lineCount: number): Array<SectionInfo | null> {
-  // Initialize all lines as null (preamble)
-  const map: Array<SectionInfo | null> = new Array(lineCount).fill(null);
-
-  function visit(node: TocNode): void {
-    const info: SectionInfo = {
-      id: node.id,
-      title: node.title,
-      level: node.level,
-      numbering: node.numbering,
-    };
-    // Assign all lines from node.line to node.line_end inclusive to this node.
-    // Children will overwrite their own ranges, achieving deepest-node semantics
-    // because we visit parent first and then children overwrite.
-    // We use 0-based indexing into the map.
-    const start = node.line - 1; // 0-based
-    const end = Math.min(node.line_end - 1, lineCount - 1); // 0-based, clamped
-    for (let i = start; i <= end; i++) {
-      map[i] = info;
-    }
-    for (const child of node.children) {
-      visit(child);
-    }
-  }
-
-  for (const root of toc) {
-    visit(root);
-  }
-
-  return map;
-}
 
 // ---------------------------------------------------------------------------
 // Matcher
@@ -175,8 +127,8 @@ export function buildSearchResponse(
 
   const hits: SearchHit[] = [];
 
-  // Build line→section map once
-  const lineSectionMap = buildLineSectionMap(index.toc, index.line_count);
+  // Use precomputed line→section map from Index
+  const lineSectionMap = index.line_section_map;
 
   // ------------------------------------------------------------------
   // Search titles
