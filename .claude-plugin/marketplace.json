@@ -8,7 +8,7 @@
       "name": "markdown-docs",
       "source": "./",
       "description": "MCP server for efficient navigation of large markdown documents",
-      "version": "0.1.3",
+      "version": "0.1.4",
       "homepage": "https://github.com/hacker-cb/markdown-docs-mcp",
       "license": "MIT"
     }
