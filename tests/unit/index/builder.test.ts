@@ -75,16 +75,6 @@ describe("buildIndex", () => {
     await expect(buildIndex("/no/such/file.md")).rejects.toBeDefined();
   });
 
-  it("populates pdf_pages on TocNode from adjacent PDF markers", async () => {
-    await withTmpFile(
-      "<!-- PDF_PAGE_BEGIN 12 -->\n# Heading\nbody\n<!-- PDF_PAGE_END 12 -->\n# Other\n",
-      async (path) => {
-        const idx = await buildIndex(path);
-        expect(idx.toc[0]?.pdf_pages).toEqual([12]);
-      }
-    );
-  });
-
   it("flags self-nesting heading and exposes it in anomalies", async () => {
     await withTmpFile(
       "# Foo\n\n## Bar\n\n### Foo\nbody\n",

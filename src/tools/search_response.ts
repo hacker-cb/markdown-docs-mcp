@@ -9,7 +9,7 @@ export type SearchHit = {
     id: string;
     title: string;
     level: number;
-    numbering: string | null;
+    numbering?: string; // omitted when null
   };
   in: "title" | "content";
 };
@@ -194,7 +194,7 @@ export function buildSearchResponse(
           id: header.id,
           title: header.title,
           level: header.level,
-          numbering: header.numbering,
+          ...(header.numbering !== null && { numbering: header.numbering }),
         },
         in: "title",
       });
@@ -245,7 +245,7 @@ export function buildSearchResponse(
           id: section.id,
           title: section.title,
           level: section.level,
-          numbering: section.numbering,
+          ...(section.numbering !== null && { numbering: section.numbering }),
         },
         in: "content",
       });

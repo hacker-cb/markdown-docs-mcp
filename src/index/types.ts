@@ -12,7 +12,6 @@ export type TocNode = {
   section_lines: number;
   is_likely_artifact: boolean; // false by default; set to true by detector for self_nesting
   artifact_reason?: string;
-  pdf_pages?: number[];
   children: TocNode[];
 };
 

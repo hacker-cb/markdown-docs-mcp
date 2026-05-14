@@ -2,7 +2,8 @@ export type AnomalyType =
   | "self_nesting_header"
   | "level_jump"
   | "orphan_subheader"
-  | "empty_section";
+  | "empty_section"
+  | "consecutive_pair_header";
 
 export type Anomaly = {
   id: string;                         // "a1", "a2", ... — sequential
@@ -14,6 +15,7 @@ export type Anomaly = {
     preceding_real_header?: { line: number; title: string; level: number };
     following_real_header?: { line: number; title: string; level: number };
     duplicates_open_ancestor?: { line: number; title: string; level: number };  // self_nesting
+    paired_with?: { line: number; title: string; level: number };               // consecutive_pair_header
     adjacent_pdf_markers?: string[];   // ["L3932 PDF_PAGE_END 38", ...]
   };
   description: string;                // human-readable

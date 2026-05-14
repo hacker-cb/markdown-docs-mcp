@@ -131,6 +131,7 @@ Skill (см. раздел 8) расширяет эту базу подсказк
 view_toc({
   file_path: string,
   depth?: number | null,      // default null = вся глубина
+  start_id?: string,          // опаковый id из предыдущего view_toc для drill-down в поддерево
   raw?: boolean,              // default false; true отключает reparenting и пометки
 }) => {
   file: {
@@ -146,6 +147,9 @@ view_toc({
     by_type: { [type: string]: number },
     hint?: string,             // присутствует если total > 0
   },
+  truncated?: boolean,         // true если ответ был обрезан для укладки в cap
+  effective_depth?: number,    // фактическая глубина после итеративного уменьшения
+  hint?: string,               // подсказка как получить больше данных (start_id / depth)
 }
 
 type TocNode = {
@@ -158,7 +162,6 @@ type TocNode = {
   section_lines: number,       // line_end - line + 1, физический размер
   is_likely_artifact: boolean,
   artifact_reason?: string,
-  pdf_pages?: number[],        // номера PDF-страниц если найдены маркеры в разделе
   children: TocNode[],
 }
 ```
@@ -169,6 +172,9 @@ type TocNode = {
 - Узлы помечаются `is_likely_artifact: true` по эвристикам (см. раздел 5).
 - Никакие узлы не удаляются. `line_end` — буквальный, по парсеру.
 - При `raw: true` reparenting и пометки отключаются — чистый вывод парсера.
+- **Server-side cap (MAX_VIEW_TOC_BYTES = 25 KB):** для очень больших документов сервер автоматически уменьшает глубину дерева (от запрошенной до 1) итеративно, пока JSON-ответ не уложится в cap. Если обрезка произошла — в ответ добавляются `truncated=true`, `effective_depth=N`, `hint` с инструкцией использовать `start_id`.
+- **`start_id`:** без него возвращается корень документа; с ним `toc[]` содержит прямых дочерних узлов указанного узла (drill-down в поддерево).
+- **JSON-компрессия:** поля с default-значениями опускаются из сериализации: `numbering` опускается если `null`; `is_likely_artifact` — если `false`; `children` — если пустой массив.
 
 ### 3.3 read_section
 
@@ -335,6 +341,8 @@ type Anomaly = {
 
 - `empty_section` — заголовок без содержимого до следующего заголовка. Information-only.
 
+- `consecutive_pair_header` — два соседних заголовка одного уровня, где первый является «голым маркером» (matching `PAIR_MARKER_RE = /^(Chapter|Part|Section|Appendix)\s+([0-9IVX]+|[A-Z])$/i`, например `Chapter 5`, `Part I`, `Section 3`), а второй стоит на расстоянии ≤ 3 строк. Такие пары характерны для pdf2md-конверсии, где маркер главы отдельно от её названия. Маркер помечается `is_likely_artifact: true`; `context.paired_with` содержит line/title/level второго заголовка.
+
 ### 5.2 Эвристика self_nesting
 
 Заголовок `H` помечается `is_likely_artifact: true` тогда и только тогда, когда:
@@ -446,7 +454,7 @@ Description пишется на английском (in-repo English convention
 
 - `tests/unit/` — парсер, эвристика artifact, TOC builder, sanitization, search, обработка комментариев. Используются маленькие inline-фикстуры markdown.
 - `tests/integration/` — реальные fixtures, end-to-end вызовы MCP через JSON-RPC stdin/stdout.
-- `tests/fixtures/public/` — `esp32-p4-datasheet.md`, `stm32h750ib.md`. Коммитятся в репо.
+- `tests/fixtures/public/` — `esp32-p4-datasheet.md`, `stm32h750ib.md`, `esp32-p4-trm.md` (ESP32-P4 Technical Reference Manual, ~143k строк, 2011 заголовков; stress fixture для тестирования view_toc cap и consecutive_pair_header). Все коммитятся в репо.
 - `tests/fixtures/private/` — gitignored. Локально содержит `IEC-62386-209-2011.md`. Тесты на private fixtures graceful skip если папка пуста (CI / чужие машины не падают).
 - Будущие fixtures — авто-подхватываются glob'ом в `tests/fixtures/public/**.md` и `tests/fixtures/private/**.md`.
 
@@ -602,11 +610,13 @@ markdown-docs-mcp/
 
 - [x] **PR-03: Parser + indexing core** — `src/parser/*` (markdown-it wrapper, comments, frontmatter, numbering), `src/index/*` (builder, LRU cache, reparenting). Unit-тесты на inline-фикстурах. Tools всё ещё возвращают `not_implemented`.
 
-- [x] **PR-04: view_toc + anomalies** — реализация `view_toc` tool (включая `pdf_pages` в metadata), anomalies detector (`self_nesting_header`, `level_jump`, `orphan_subheader`, `empty_section`). Integration test на public fixtures + line-coverage invariant («no content loss»).
+- [x] **PR-04: view_toc + anomalies** — реализация `view_toc` tool, anomalies detector (`self_nesting_header`, `level_jump`, `orphan_subheader`, `empty_section`). Integration test на public fixtures + line-coverage invariant («no content loss»).
 
 - [x] **PR-05: read_section** — `raw` + `logical` modes, `include_subsections`, `include_comments`, truncation с hard cap 200 KB + continuation через `from_line`. Byte-reconstruction invariant на public fixtures.
 
 - [x] **PR-06: search + analyze_document** — оба оставшихся tool'а. `search` с `scope`, `regex`, `case_sensitive`, `context_lines`. `analyze_document` с `logical_effect` и `adjacent_pdf_markers`. Integration tests.
+
+- [x] **PR-06.1: Huge documents support** — view_toc cap + start_id, JSON compression, consecutive_pair_header anomaly, TRM stress fixture. (Подробности: docs/superpowers/specs/2026-05-14-huge-documents-support-design.md)
 
 - [ ] **PR-07: Plugin packaging** — `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `.mcp.json`, `skills/reading-large-markdown/SKILL.md` + `references/pdf-converted-docs.md`. Manual smoke test через `claude --plugin-dir`.
 

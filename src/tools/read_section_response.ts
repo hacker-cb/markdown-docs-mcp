@@ -1,6 +1,7 @@
 import type { Index, TocNode } from "../index/types.js";
 import type { CommentRange } from "../parser/comments.js";
 import type { ReadSectionInput } from "../schemas/inputs.js";
+import { compactTocNode, type CompactTocNode } from "./_compact.js";
 
 export type AbsorbedArtifact = {
   id: string;
@@ -19,7 +20,7 @@ export type ReadSectionResponse = {
     numbering: string | null;
   };
   content: string;
-  children?: TocNode[];
+  children?: CompactTocNode[];
   expansion?: {
     raw_line_end: number;
     logical_line_end: number;
@@ -316,7 +317,9 @@ export function buildReadSectionResponse(
 
   // 7. Build children mini-TOC if include_subsections=false and node has children
   const children =
-    !includeSubsections && node.children.length > 0 ? node.children : undefined;
+    !includeSubsections && node.children.length > 0
+      ? node.children.map(compactTocNode)
+      : undefined;
 
   // 8. Build response
   const response: ReadSectionResponse = {

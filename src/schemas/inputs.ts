@@ -14,7 +14,16 @@ export const viewTocInput = z.object({
     .max(6)
     .nullable()
     .optional()
-    .describe("Limit TOC tree depth. null (default) returns the full hierarchy."),
+    .describe("Limit TOC tree depth. null (default) returns the full hierarchy up to depth 6."),
+  start_id: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      "Opaque section id obtained from view_toc, used to navigate into a subtree. " +
+        "Without start_id, the root of the document is returned. With start_id, " +
+        "toc[] contains the immediate children of that node."
+    ),
   raw: z
     .boolean()
     .optional()

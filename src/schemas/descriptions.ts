@@ -5,9 +5,11 @@
 
 export const VIEW_TOC_DESCRIPTION = `Returns the table of contents of a large markdown file as a tree of headings.
 
-Each node has: opaque id (format: s<line>), level (1-6), title, optional numbering ("4.1.2"), line/line_end range, section size in lines, is_likely_artifact flag, optional pdf_pages, and children. The response also includes file metadata, optional YAML frontmatter, and anomalies_summary.
+Each node has: opaque id (format: s<line>), level (1-6), title, optional numbering ("4.1.2"), line/line_end range, section size in lines. Fields is_likely_artifact and children are omitted when their default values apply (false / empty). The response includes file metadata, optional YAML frontmatter, and anomalies_summary.
 
-Use this as the entry point when reading any markdown document larger than ~500 lines. The response is ~1-3 KB JSON regardless of file size, and lets you address sections by opaque id without reading the whole file.
+For very large documents the server auto-reduces depth to keep the response under 25 KB and sets truncated=true, effective_depth=N, and hint="Tree trimmed from depth D to N; use start_id=<id> to drill deeper." When even depth=1 is too large, a prefix of root nodes is returned with a matching hint. Use start_id to navigate into a subtree: pass an id from a previous view_toc call and toc[] will contain that node's immediate children.
+
+Use this as the entry point when reading any markdown document larger than ~500 lines. The response is bounded in size regardless of file size, and lets you address sections by opaque id without reading the whole file.
 
 If anomalies_summary.total > 0, the document has structural anomalies (most often PDF-conversion artifacts). Call analyze_document for details before relying on raw section boundaries.
 
@@ -43,9 +45,9 @@ This is grep-like (substring/regex), not semantic search.`;
 
 export const ANALYZE_DOCUMENT_DESCRIPTION = `Returns a diagnostic report on structural anomalies in a markdown document.
 
-Reports types: self_nesting_header (a heading that duplicates one of its open ancestors — almost always a PDF page header artifact), level_jump (unexpected hierarchy gap remaining after reparenting), orphan_subheader (first heading has level > 1), empty_section.
+Reports types: self_nesting_header (a heading that duplicates one of its open ancestors — almost always a PDF page header artifact), level_jump (unexpected hierarchy gap remaining after reparenting), orphan_subheader (first heading has level > 1), empty_section, consecutive_pair_header (a bare generic marker like "Chapter 5" or "Part I" immediately followed by the actual content heading at the same level — characteristic pdf2md double-heading pattern; the marker node is flagged is_likely_artifact=true and context.paired_with identifies the content heading).
 
-Each anomaly carries context: preceding/following real heading, the duplicated ancestor for self-nesting cases, and adjacent_pdf_markers (e.g. ["L3932 PDF_PAGE_END 38"]) — independent evidence of PDF-conversion origin. For self-nesting findings, logical_effect describes what would happen if that node were treated as an artifact (which section would absorb its lines, by how much).
+Each anomaly carries context: preceding/following real heading, the duplicated ancestor for self-nesting cases, paired_with for consecutive_pair_header cases, and adjacent_pdf_markers (e.g. ["L3932 PDF_PAGE_END 38"]) — independent evidence of PDF-conversion origin. For self-nesting findings, logical_effect describes what would happen if that node were treated as an artifact (which section would absorb its lines, by how much).
 
 This tool only DESCRIBES anomalies. It does NOT modify the document and does NOT suggest specific edits — the agent decides, in dialogue with the user, whether to apply file fixes, use read_section with mode="logical", or leave the document as-is.
 

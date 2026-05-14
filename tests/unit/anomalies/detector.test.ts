@@ -113,6 +113,73 @@ describe("detectAnomalies", () => {
     expect(result.filter((a) => a.type === "empty_section")).toHaveLength(1);
   });
 
+  it("detects consecutive_pair_header for 'Chapter 5' + 'Title'", () => {
+    const flat: FlatHeader[] = [
+      { id: "s1", level: 1, title: "Chapter 5", numbering: "5", line: 1 },
+      { id: "s3", level: 1, title: "GDMA Controller", numbering: null, line: 3 },
+    ];
+    const tree = [
+      mkNode("s1", 1, "Chapter 5", 1, 2),
+      mkNode("s3", 1, "GDMA Controller", 3, 10),
+    ];
+    const result = detectAnomalies(
+      mkIndex({ toc: tree, flat, line_count: 10 })
+    );
+    const pair = result.filter((a) => a.type === "consecutive_pair_header");
+    expect(pair).toHaveLength(1);
+    expect(pair[0]?.node_id).toBe("s1");
+    expect(pair[0]?.context.paired_with).toMatchObject({
+      line: 3,
+      title: "GDMA Controller",
+      level: 1,
+    });
+  });
+
+  it("does not match content-rich headings starting with 'Chapter'", () => {
+    const flat: FlatHeader[] = [
+      { id: "s1", level: 1, title: "Chapter 5: Architecture", numbering: null, line: 1 },
+      { id: "s3", level: 1, title: "Overview", numbering: null, line: 3 },
+    ];
+    const result = detectAnomalies(
+      mkIndex({
+        toc: [mkNode("s1", 1, "Chapter 5: Architecture", 1, 2), mkNode("s3", 1, "Overview", 3, 10)],
+        flat,
+        line_count: 10,
+      })
+    );
+    expect(result.filter((a) => a.type === "consecutive_pair_header")).toHaveLength(0);
+  });
+
+  it("recognizes Roman numerals (Part I, Part II)", () => {
+    const flat: FlatHeader[] = [
+      { id: "s1", level: 1, title: "Part I", numbering: null, line: 1 },
+      { id: "s2", level: 1, title: "Microprocessor and Master", numbering: null, line: 2 },
+    ];
+    const result = detectAnomalies(
+      mkIndex({
+        toc: [mkNode("s1", 1, "Part I", 1, 1), mkNode("s2", 1, "Microprocessor and Master", 2, 10)],
+        flat,
+        line_count: 10,
+      })
+    );
+    expect(result.filter((a) => a.type === "consecutive_pair_header")).toHaveLength(1);
+  });
+
+  it("does not match when headers are too far apart (> 3 lines)", () => {
+    const flat: FlatHeader[] = [
+      { id: "s1", level: 1, title: "Chapter 5", numbering: "5", line: 1 },
+      { id: "s10", level: 1, title: "Something", numbering: null, line: 10 },
+    ];
+    const result = detectAnomalies(
+      mkIndex({
+        toc: [mkNode("s1", 1, "Chapter 5", 1, 9), mkNode("s10", 1, "Something", 10, 15)],
+        flat,
+        line_count: 15,
+      })
+    );
+    expect(result.filter((a) => a.type === "consecutive_pair_header")).toHaveLength(0);
+  });
+
   it("attaches adjacent_pdf_markers when markers within +/-3 lines", () => {
     const grandchild = mkNode("s5", 3, "Foo", 5, 7);
     const child = mkNode("s3", 2, "Bar", 3, 7, [grandchild]);

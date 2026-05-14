@@ -132,6 +132,31 @@ export function detectAnomalies(index: Index): Anomaly[] {
     }
   });
 
+  // 5. consecutive_pair_header (pdf2md-style double headings)
+  const PAIR_MARKER_RE = /^(Chapter|Part|Section|Appendix)\s+([0-9IVX]+|[A-Z])$/i;
+
+  for (let i = 0; i < flat.length - 1; i++) {
+    const cur = flat[i]!;
+    const next = flat[i + 1]!;
+    if (
+      cur.level === next.level &&
+      next.line - cur.line <= 3 &&
+      PAIR_MARKER_RE.test(cur.title.trim())
+    ) {
+      push({
+        type: "consecutive_pair_header",
+        line: cur.line,
+        raw_text: `${"#".repeat(cur.level)} ${cur.title}`,
+        node_id: cur.id,
+        context: {
+          paired_with: { line: next.line, title: next.title, level: next.level },
+          adjacent_pdf_markers: adjacentMarkers(cur.line, index.pdf_markers),
+        },
+        description: `Generic marker "${cur.title}" on L${cur.line} is followed by content header "${next.title}" on L${next.line} at the same level. Likely a pdf2md-style double heading where the marker can be absorbed into the content header.`,
+      });
+    }
+  }
+
   return anomalies;
 }
 
