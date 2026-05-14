@@ -205,7 +205,14 @@ function main(argv) {
     cwd: REPO_ROOT,
     stdio: "inherit",
   });
-  execSync(`git tag v${version}`, { cwd: REPO_ROOT, stdio: "inherit" });
+  // Annotated tag is intentional: `git push --follow-tags` (in the README +
+  // CLAUDE.md release recipe) only pushes annotated tags. A plain `git tag X`
+  // would create a lightweight tag that the documented push command silently
+  // leaves behind on the local machine.
+  execSync(`git tag -a v${version} -m "release v${version}"`, {
+    cwd: REPO_ROOT,
+    stdio: "inherit",
+  });
 
   console.log(`\nReady. Push with:\n\n  git push --follow-tags origin master\n`);
 }
