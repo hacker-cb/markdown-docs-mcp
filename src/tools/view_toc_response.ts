@@ -1,8 +1,7 @@
 import type { Index, TocNode } from "../index/types.js";
 import type { ViewTocInput } from "../schemas/inputs.js";
 import { compactTocNodeAtDepth, type CompactTocNode } from "./_compact.js";
-
-const MAX_VIEW_TOC_BYTES = 25 * 1024; // 25 KB
+import { DEFAULT_CONFIG } from "../config.js";
 
 export type ViewTocResponse = {
   file: {
@@ -104,7 +103,8 @@ function buildFileMeta(index: Index): ViewTocResponse["file"] {
 
 export function buildViewTocResponse(
   index: Index,
-  input: ViewTocInput
+  input: ViewTocInput,
+  maxBytes: number = DEFAULT_CONFIG.maxViewTocBytes
 ): ViewTocResponse {
   const raw = input.raw === true;
   const file = buildFileMeta(index);
@@ -116,7 +116,7 @@ export function buildViewTocResponse(
     // Try to fit within cap
     const response: ViewTocResponse = { file, toc: allFlat, anomalies_summary };
     const bytes = Buffer.byteLength(JSON.stringify(response), "utf8");
-    if (bytes <= MAX_VIEW_TOC_BYTES) {
+    if (bytes <= maxBytes) {
       return response;
     }
     // Take a prefix
@@ -131,7 +131,7 @@ export function buildViewTocResponse(
         effective_depth: 1,
         hint: `Document has too many headers (${allFlat.length}). Returned first ${n}. Use start_id to navigate further.`,
       };
-      if (Buffer.byteLength(JSON.stringify(candidate), "utf8") <= MAX_VIEW_TOC_BYTES) {
+      if (Buffer.byteLength(JSON.stringify(candidate), "utf8") <= maxBytes) {
         return candidate;
       }
     }
@@ -169,7 +169,7 @@ export function buildViewTocResponse(
     const trimmed = trimAndCompact(subtree, d);
     const candidate: ViewTocResponse = { file, toc: trimmed, anomalies_summary };
     const bytes = Buffer.byteLength(JSON.stringify(candidate), "utf8");
-    if (bytes <= MAX_VIEW_TOC_BYTES) {
+    if (bytes <= maxBytes) {
       if (d < requested) {
         return {
           ...candidate,
@@ -196,7 +196,7 @@ export function buildViewTocResponse(
       effective_depth: 1,
       hint: `Document has too many root sections (${total}). Returned first ${n}. Use start_id to navigate further.`,
     };
-    if (Buffer.byteLength(JSON.stringify(candidate), "utf8") <= MAX_VIEW_TOC_BYTES) {
+    if (Buffer.byteLength(JSON.stringify(candidate), "utf8") <= maxBytes) {
       return candidate;
     }
   }

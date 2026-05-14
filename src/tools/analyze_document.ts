@@ -8,6 +8,6 @@ export function makeAnalyzeDocumentHandler(cache: IndexCache) {
   }> {
     const index = await cache.getOrBuild(input.file_path);
     const response = buildAnalyzeDocumentResponse(index, input);
-    return { content: [{ type: "text", text: JSON.stringify(response, null, 2) }] };
+    return { content: [{ type: "text", text: JSON.stringify(response) }] };
   };
 }

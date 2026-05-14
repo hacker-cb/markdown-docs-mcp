@@ -173,9 +173,10 @@ type TocNode = {
 - Узлы помечаются `is_likely_artifact: true` по эвристикам (см. раздел 5).
 - Никакие узлы не удаляются. `line_end` — буквальный, по парсеру.
 - При `raw: true` reparenting и пометки отключаются — чистый вывод парсера.
-- **Server-side cap (MAX_VIEW_TOC_BYTES = 25 KB):** для очень больших документов сервер автоматически уменьшает глубину дерева (от запрошенной до 1) итеративно, пока JSON-ответ не уложится в cap. Если обрезка произошла — в ответ добавляются `truncated=true`, `effective_depth=N`, `hint` с инструкцией использовать `start_id`.
+- **Server-side cap (default 50 KB, override via `MARKDOWN_DOCS_MAX_TOC_BYTES`):** для очень больших документов сервер итеративно уменьшает глубину дерева (от запрошенной до 1), пока compact-JSON ответ не уложится в cap. Если обрезка произошла — в ответ добавляются `truncated=true`, `effective_depth=N`, `hint` с инструкцией использовать `start_id`. Cap считается на той же compact-сериализации, которая фактически возвращается клиенту (без `JSON.stringify` indent), что исключает расхождение между измеренным и реальным размером payload. Верхний потолок env-var override — 500 KB (соответствует Claude Code `anthropic/maxResultSizeChars` ceiling).
+- **MCP annotation:** при регистрации tool'а сервер передаёт `_meta["anthropic/maxResultSizeChars"]: 200000` — Claude Code v2.1.91+ читает эту аннотацию и не truncate'ит inline-display для ответов до 200K chars. Другие MCP-клиенты игнорируют поле.
 - **`start_id`:** без него возвращается корень документа; с ним `toc[]` содержит прямых дочерних узлов указанного узла (drill-down в поддерево).
-- **JSON-компрессия:** поля с default-значениями опускаются из сериализации: `numbering` опускается если `null`; `is_likely_artifact` — если `false`; `children` — если пустой массив.
+- **JSON-компрессия:** поля с default-значениями опускаются из сериализации: `numbering` опускается если `null`; `is_likely_artifact` — если `false`; `children` — если пустой массив. Все четыре tool'а отдают compact JSON (без indent) для минимизации agent context budget.
 
 ### 3.3 read_section
 
@@ -213,7 +214,7 @@ read_section({
 - Возвращается текст от строки заголовка до `line_end` парсера.
 - Если `include_subsections: false`, возврат обрезается на первом дочернем заголовке, в `children` возвращается мини-TOC.
 - Если `include_comments: false` (default), HTML-комментарии вырезаются из content (но абсолютные line numbers не пересчитываются — gaps видны).
-- Hard cap 200 KB на response.content; превышение — `truncated: true`, `truncated_at_line: N`. Continuation через `from_line: N+1`.
+- Hard cap на `response.content` (default 200 KB, override via `MARKDOWN_DOCS_MAX_SECTION_BYTES`, ceiling 500 KB); превышение — `truncated: true`, `truncated_at_line: N`. Continuation через `from_line: N+1`. Tool регистрируется с тем же `_meta["anthropic/maxResultSizeChars"]: 200000` annotation для Claude Code.
 
 Поведение `mode: "logical"`:
 
@@ -514,6 +515,23 @@ Single source of truth — `package.json` version. Release script (`scripts/rele
 - Семантическое: `0.x.x` до публичного API stability, `1.0.0+` после.
 - В git ветки `dev` / `master` — по конвенции проектов hacker-cb (`master` создаётся при первом релизе, до этого только `dev`).
 
+### 10.5 Конфигурация через окружение
+
+Сервер читает 2 env vars при старте (`src/config.ts:loadConfig`):
+
+| Variable                              | Default  | Cap     | Назначение                                       |
+| ------------------------------------- | -------- | ------- | ------------------------------------------------ |
+| `MARKDOWN_DOCS_MAX_TOC_BYTES`         | 51 200   | 500 000 | Cap на compact-JSON `view_toc` response          |
+| `MARKDOWN_DOCS_MAX_SECTION_BYTES`     | 204 800  | 500 000 | Cap на `read_section.content` (раздел документа) |
+
+Ceiling 500 000 соответствует Claude Code `_meta["anthropic/maxResultSizeChars"]` annotation, которую сервер выставляет на 200 000 при регистрации `view_toc` и `read_section`. Невалидные значения env (non-integer / ≤ 0) — warn в stderr и fallback на default; сервер не падает. Значения > 500 000 — warn и clamp к ceiling.
+
+Тонкости:
+
+- Cap считается на compact-JSON (`JSON.stringify(response)` без indent) — это та же сериализация, которая фактически отдаётся клиенту. Раньше (до PR-06.3) cap измерял compact, а tool отдавал pretty-print с indent=2 — расхождение ~40% делало контракт `truncated` ненадёжным.
+- Все 4 tool'а отдают compact JSON. Для search и analyze_document cap не применяется — их ответы limited by `max_results` и количеством аномалий.
+- В тестах cap инжектится через `createServer({ cache, config: { maxViewTocBytes: ..., maxSectionBytes: ... } })` для проверки поведения cap-loop'а независимо от размера fixture.
+
 ## 11. Структура репозитория
 
 ```
@@ -620,6 +638,8 @@ markdown-docs-mcp/
 - [x] **PR-06.1: Huge documents support** — view_toc cap + start_id, JSON compression, consecutive_pair_header anomaly, TRM stress fixture. (Подробности: docs/superpowers/specs/2026-05-14-huge-documents-support-design.md)
 
 - [x] **PR-06.2: has_children + workflow hint** — view_toc nodes carry has_children:true when children were trimmed; description gains workflow block. (Refinement of PR-06.1 after manual testing.)
+
+- [x] **PR-06.3: cap-fix + env config + maxResultSizeChars** — compact JSON во всех 4 tools (cap и output теперь меряются на одном представлении), env-vars `MARKDOWN_DOCS_MAX_TOC_BYTES` / `MARKDOWN_DOCS_MAX_SECTION_BYTES` для override (defaults 50 / 200 KB, ceiling 500 KB), Claude Code `_meta["anthropic/maxResultSizeChars"]: 200000` annotation на view_toc и read_section.
 
 - [ ] **PR-07: Plugin packaging** — `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `.mcp.json`, `skills/reading-large-markdown/SKILL.md` + `references/pdf-converted-docs.md`. Manual smoke test через `claude --plugin-dir`.
 
