@@ -4,8 +4,6 @@ MCP server for efficient navigation of large markdown documents — datasheets, 
 
 Lets agents read what they need from a 100 000+ line markdown file without dumping the whole thing into context.
 
-See [docs/superpowers/specs/](docs/superpowers/specs/) for the design.
-
 ## Tools
 
 - `view_toc` — get document structure (TOC with line ranges, sizes, anomaly hints; auto-trims to fit a configurable byte cap).
@@ -47,6 +45,26 @@ Two optional env vars override response caps (see `src/config.ts`):
 | `MARKDOWN_DOCS_MAX_SECTION_BYTES`   | 204 800  | 500 000 | Cap on `read_section.content`            |
 
 Invalid values warn to stderr and fall back to default; the server does not refuse to start.
+
+## Known limitations
+
+Issues identified during the pre-release code review but deliberately deferred — they have not surfaced on real workloads so far, and fixing them prematurely would add complexity for no current benefit. Revisit when observed in practice:
+
+- **Regex DoS surface in `search`.** A user-supplied regex (`regex: true`) is evaluated against every body line of the indexed document (up to 143k lines / 5 MB on the largest fixture). A pathological pattern with nested quantifiers (`(a+)+$` and similar) can hang the server thread with no way for the MCP client to cancel it. Mitigation when needed: depend on `re2` (linear-time engine) or wrap `.exec` in a `setImmediate`-paced loop with a wall-clock budget.
+- **Concurrent `getOrBuild` race in the LRU cache.** Two near-simultaneous tool calls on a freshly-evicted (or fresh) file both miss, both run `buildIndex` end-to-end (90–120 s on the largest fixture), and the second result overwrites the first. Stdio MCP transports are typically single-flight per session so this is mostly theoretical today, but parallel-aware clients (`Promise.all([...])`) can hit it. Fix: store the in-flight `Promise<Index>` in a `Map<string, Promise<Index>>` keyed by the resolved path.
+- **`stripComments` is `O(lines × ranges)`.** For each comment range the function builds a per-line `Set` and probes it line-by-line. On a section containing thousands of `<!-- PDF_PAGE_BEGIN n -->` markers this becomes the dominant cost of `read_section`. Today it stays cheap because the section byte cap keeps the inner loop small; if `MARKDOWN_DOCS_MAX_SECTION_BYTES` is raised toward the 500 KB ceiling it will degrade. Fix: sort ranges once at index-build time and use a two-pointer walk, or precompute a boolean line-flag array.
+
+## Not in scope (MVP)
+
+Deliberate omissions — out of scope for the current MCP, not bugs:
+
+- Semantic search (embeddings). `search` is grep-like by design.
+- Table parsing into JSON / structured form.
+- Image parsing / OCR.
+- On-disk index cache (in-memory LRU is enough for the realistic working set).
+- A `numbering_filter` parameter on `view_toc` — add it if a real workflow needs it.
+- Performance benchmarks as a CI gate (smoke tests only).
+- Wrappers for other platforms (Cursor extension, Copilot CLI plugin, Gemini CLI extension, etc.). The MCP server already works with any MCP-compatible client over stdio; a platform-specific wrapper is separate work, done on demand.
 
 ## Development
 
