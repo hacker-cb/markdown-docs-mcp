@@ -1,0 +1,53 @@
+// tests/integration/tools-call-stub.test.ts
+// Verifies that each tool stub returns an error response (not_implemented) when called.
+
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { createServer } from "../../src/server.js";
+
+// Minimal valid args for each tool (satisfying required Zod fields).
+const TOOL_ARGS: Record<string, Record<string, unknown>> = {
+  view_toc: { file_path: "/tmp/test.md" },
+  read_section: { file_path: "/tmp/test.md", section_id: "s1" },
+  search: { file_path: "/tmp/test.md", query: "hello" },
+  analyze_document: { file_path: "/tmp/test.md" },
+};
+
+describe("tools/call stubs", () => {
+  let client: Client;
+
+  beforeAll(async () => {
+    const server = createServer();
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    client = new Client({ name: "test-client", version: "0.0.1" });
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+  });
+
+  afterAll(async () => {
+    await client?.close();
+  });
+
+  for (const toolName of Object.keys(TOOL_ARGS)) {
+    it(`${toolName} returns an error result`, async () => {
+      const result = await client.callTool({
+        name: toolName,
+        arguments: TOOL_ARGS[toolName],
+      });
+
+      // SDK wraps thrown errors as { isError: true, content: [{ type: "text", text: "..." }] }
+      expect(result.isError, `${toolName} should set isError`).toBe(true);
+
+      const texts = (result.content as Array<{ type: string; text?: string }>)
+        .filter((c) => c.type === "text")
+        .map((c) => c.text ?? "");
+
+      const combinedText = texts.join(" ").toLowerCase();
+      expect(
+        combinedText.includes("not") || combinedText.includes("implement"),
+        `${toolName} error text should mention "not implemented", got: ${combinedText}`
+      ).toBe(true);
+    });
+  }
+});
