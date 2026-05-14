@@ -1,4 +1,17 @@
-// markdown-docs-mcp entry point.
-// MCP server wiring lands in PR-02; for now this is a placeholder
-// so the build pipeline has something to bundle.
-console.error("markdown-docs-mcp: not implemented yet");
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { createServer } from "./server.js";
+
+async function main() {
+  const server = createServer();
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  // Server runs until stdin closes or the process receives a termination signal.
+}
+
+process.on("SIGINT", () => process.exit(0));
+process.on("SIGTERM", () => process.exit(0));
+
+main().catch((err) => {
+  console.error("markdown-docs-mcp fatal error:", err);
+  process.exit(1);
+});

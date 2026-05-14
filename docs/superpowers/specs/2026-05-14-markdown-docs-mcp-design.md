@@ -598,7 +598,7 @@ markdown-docs-mcp/
 
 - [x] **PR-01: Bootstrap** — `package.json`, `tsconfig.json`, esbuild config, vitest config, GitHub Actions test workflow, LICENSE, README skeleton, public fixtures (`esp32-p4-datasheet.md`, `stm32h750ib.md`). Без логики MCP.
 
-- [ ] **PR-02: MCP server skeleton** — stdio entry (`src/index.ts`), Zod schemas (`src/schemas/`), регистрация четырёх tools через стандартный `tools/list`. Tools возвращают `not_implemented` error до своей очереди. Базовый JSON-RPC integration test (handshake + список tools).
+- [x] **PR-02: MCP server skeleton** — stdio entry (`src/index.ts`), Zod schemas (`src/schemas/`), регистрация четырёх tools через стандартный `tools/list`. Tools возвращают `not_implemented` error до своей очереди. Базовый JSON-RPC integration test (handshake + список tools).
 
 - [ ] **PR-03: Parser + indexing core** — `src/parser/*` (markdown-it wrapper, comments, frontmatter, numbering), `src/index/*` (builder, LRU cache, reparenting). Unit-тесты на inline-фикстурах. Tools всё ещё возвращают `not_implemented`.
 
