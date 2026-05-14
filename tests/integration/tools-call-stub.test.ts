@@ -8,8 +8,8 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createServer } from "../../src/server.js";
 
 // Minimal valid args for each stub tool (satisfying required Zod fields).
+// read_section is now implemented (PR-05); only search and analyze_document remain as stubs.
 const TOOL_ARGS: Record<string, Record<string, unknown>> = {
-  read_section: { file_path: "/tmp/test.md", section_id: "s1" },
   search: { file_path: "/tmp/test.md", query: "hello" },
   analyze_document: { file_path: "/tmp/test.md" },
 };
