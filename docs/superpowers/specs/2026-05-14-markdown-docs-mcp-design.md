@@ -612,7 +612,7 @@ markdown-docs-mcp/
 
 - **Regex DoS surface в search.** Пользовательский regex (через model-supplied query) выполняется на всех строках документа (до 143k на TRM). Pathological pattern с nested quantifiers зависнет thread без возможности отмены. Mitigation — depend on `re2` (linear-time engine) или wall-clock budget + per-line `setImmediate` paced loop. Пока не наблюдалось на practical fixtures.
 - **Concurrent `getOrBuild` race в LRU-кэше.** Две одновременные tool-call'ы на свежевыселенный файл оба миссят, оба строят индекс end-to-end (90-120 s на TRM), второй перезаписывает первый. Stdio MCP обычно single-flight, но parallel-aware clients (`Promise.all([...])`) могут попасть. Fix — `Map<string, Promise<Index>>` в кэше.
-- **`stripComments` O(lines × ranges).** При section cap > 200 KB и тысячах PDF-маркеров комментариев деградирует. Сейчас мacks'ируется тем что cap держит inner loop коротким. Fix — two-pointer walk или pre-computed boolean line-flag array.
+- **`stripComments` O(lines × ranges).** При section cap > 200 KB и тысячах PDF-маркеров комментариев деградирует. Сейчас маскируется тем что cap держит inner loop коротким. Fix — two-pointer walk или pre-computed boolean line-flag array.
 
 ## 14. Открытые вопросы
 
