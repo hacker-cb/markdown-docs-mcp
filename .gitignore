@@ -1,0 +1,48 @@
+# --- OS ---
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+Thumbs.db
+ehthumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# --- Editor swap / backup ---
+*.swp
+*.swo
+*~
+
+# --- Claude Code: per-developer files ---
+# Committed: .claude/settings.json, .claude/agents/, .claude/commands/,
+#            .claude/hooks/, .claude/rules/, .claude/skills/,
+#            .claude/agent-memory/, CLAUDE.md, .mcp.json, .worktreeinclude
+.claude/settings.local.json
+.claude/*.local.json
+CLAUDE.local.md
+# Lock from the /schedule and /loop plugins; harmless if those are unused.
+.claude/scheduled_tasks.lock
+
+# --- Superpowers per-session artifacts ---
+# Sibling docs/superpowers/{specs,plans}/ is COMMITTED — never list it here.
+.superpowers/
+
+# --- Git worktrees ---
+.worktrees/
+
+# --- Node / TypeScript ---
+node_modules/
+dist/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+coverage/
+.nyc_output/
+
+# --- Test fixtures: private (not redistributable) ---
+# The directory is kept via .gitkeep; only contents are ignored.
+tests/fixtures/private/*
+!tests/fixtures/private/.gitkeep
