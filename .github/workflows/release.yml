@@ -15,6 +15,9 @@ concurrency:
 
 jobs:
   publish:
+    # Skip on forks: npm Trusted Publisher is bound to hacker-cb/markdown-docs-mcp,
+    # so a fork's tag push would burn CI minutes only to fail at `npm publish`.
+    if: github.repository_owner == 'hacker-cb'
     name: publish to npm + GitHub Release
     runs-on: ubuntu-latest
     timeout-minutes: 15
