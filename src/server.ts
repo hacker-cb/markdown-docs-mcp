@@ -1,6 +1,6 @@
 // MCP server factory. Registers four tools with self-contained descriptions
-// and Zod-validated inputs. view_toc is fully implemented; the other three
-// remain stubs (NotImplementedError) until PR-05+.
+// and Zod-validated inputs. view_toc and read_section are fully implemented;
+// search and analyze_document remain stubs (NotImplementedError) until PR-06+.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
@@ -16,7 +16,7 @@ import {
   ANALYZE_DOCUMENT_DESCRIPTION,
 } from "./schemas/descriptions.js";
 import { makeViewTocHandler } from "./tools/view_toc.js";
-import { readSection } from "./tools/read_section.js";
+import { makeReadSectionHandler } from "./tools/read_section.js";
 import { search } from "./tools/search.js";
 import { analyzeDocument } from "./tools/analyze_document.js";
 import { IndexCache } from "./index/cache.js";
@@ -31,6 +31,7 @@ export function createServer(deps: ServerDeps = {}): McpServer {
   });
 
   const viewTocHandler = makeViewTocHandler(cache);
+  const readSectionHandler = makeReadSectionHandler(cache);
 
   // registerTool(name, config, callback) — preferred non-deprecated API in SDK 1.29.
   // inputSchema accepts a full Zod object schema (AnySchema); SDK converts it to
@@ -52,9 +53,7 @@ export function createServer(deps: ServerDeps = {}): McpServer {
       description: READ_SECTION_DESCRIPTION,
       inputSchema: readSectionInput,
     },
-    async (args) => {
-      return await readSection(args);
-    }
+    async (args) => readSectionHandler(args)
   );
 
   server.registerTool(

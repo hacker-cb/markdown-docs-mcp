@@ -604,7 +604,7 @@ markdown-docs-mcp/
 
 - [x] **PR-04: view_toc + anomalies** — реализация `view_toc` tool (включая `pdf_pages` в metadata), anomalies detector (`self_nesting_header`, `level_jump`, `orphan_subheader`, `empty_section`). Integration test на public fixtures + line-coverage invariant («no content loss»).
 
-- [ ] **PR-05: read_section** — `raw` + `logical` modes, `include_subsections`, `include_comments`, truncation с hard cap 200 KB + continuation через `from_line`. Byte-reconstruction invariant на public fixtures.
+- [x] **PR-05: read_section** — `raw` + `logical` modes, `include_subsections`, `include_comments`, truncation с hard cap 200 KB + continuation через `from_line`. Byte-reconstruction invariant на public fixtures.
 
 - [ ] **PR-06: search + analyze_document** — оба оставшихся tool'а. `search` с `scope`, `regex`, `case_sensitive`, `context_lines`. `analyze_document` с `logical_effect` и `adjacent_pdf_markers`. Integration tests.
 
