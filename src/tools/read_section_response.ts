@@ -1,7 +1,7 @@
 import type { Index, TocNode } from "../index/types.js";
 import type { CommentRange } from "../parser/comments.js";
 import type { ReadSectionInput } from "../schemas/inputs.js";
-import { compactTocNode, type CompactTocNode } from "./_compact.js";
+import { compactTocNodeAtDepth, type CompactTocNode } from "./_compact.js";
 
 export type AbsorbedArtifact = {
   id: string;
@@ -315,10 +315,12 @@ export function buildReadSectionResponse(
   const truncResult = truncateAtBytes(content, start_line, index.line_offsets, MAX_BYTES);
   content = truncResult.content;
 
-  // 7. Build children mini-TOC if include_subsections=false and node has children
+  // 7. Build children mini-TOC if include_subsections=false and node has children.
+  // Use compactTocNodeAtDepth(child, 1) so that grandchildren availability is
+  // signalled via has_children=true on each direct child.
   const children =
     !includeSubsections && node.children.length > 0
-      ? node.children.map(compactTocNode)
+      ? node.children.map((child) => compactTocNodeAtDepth(child, 1))
       : undefined;
 
   // 8. Build response
