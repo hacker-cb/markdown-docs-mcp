@@ -73,15 +73,12 @@ export function extractLogicalRange(
     raw_line_end = node.line_end;
   }
 
-  // Build a map from id to TocNode for all flat_headers — we need TocNode details.
-  // We need the actual TocNode for each flat_header to check is_likely_artifact.
-  // flat_headers doesn't have is_likely_artifact, so we need to find nodes in toc.
-  // Build a flat map id -> TocNode from the full tree.
-  const nodeById = buildNodeMap(index.toc);
+  // Use shared maps from index (populated once at build time).
+  const nodeById = index.node_by_id;
 
   // Walk flat_headers after node's position to find nodes that start after raw_line_end.
   // Find the index of our node in flat_headers.
-  const nodeIdx = index.flat_headers.findIndex((h) => h.id === node.id);
+  const nodeIdx = index.flat_index_by_id.get(node.id) ?? -1;
 
   const artifacts_absorbed: AbsorbedArtifact[] = [];
   let logical_line_end = raw_line_end;
@@ -123,18 +120,6 @@ export function extractLogicalRange(
   }
 
   return { start_line, raw_line_end, logical_line_end, artifacts_absorbed };
-}
-
-function buildNodeMap(nodes: TocNode[]): Map<string, TocNode> {
-  const map = new Map<string, TocNode>();
-  for (const node of nodes) {
-    map.set(node.id, node);
-    const childMap = buildNodeMap(node.children);
-    for (const [k, v] of childMap) {
-      map.set(k, v);
-    }
-  }
-  return map;
 }
 
 /**
@@ -239,8 +224,7 @@ export function buildReadSectionResponse(
   maxBytes: number = DEFAULT_CONFIG.maxSectionBytes
 ): ReadSectionResponse {
   // 1. Find node by section_id
-  const nodeById = buildNodeMap(index.toc);
-  const node = nodeById.get(input.section_id);
+  const node = index.node_by_id.get(input.section_id);
   if (!node) {
     const err = new Error(
       `Unknown section_id "${input.section_id}". Use view_toc to list valid section ids for this file.`
