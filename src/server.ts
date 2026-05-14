@@ -19,18 +19,27 @@ import { makeReadSectionHandler } from "./tools/read_section.js";
 import { makeSearchHandler } from "./tools/search.js";
 import { makeAnalyzeDocumentHandler } from "./tools/analyze_document.js";
 import { IndexCache } from "./index/cache.js";
+import type { Config } from "./config.js";
+import { DEFAULT_CONFIG } from "./config.js";
 
-export type ServerDeps = { cache?: IndexCache };
+export type ServerDeps = { cache?: IndexCache; config?: Config };
+
+// Claude Code v2.1.91+ honors this _meta annotation to lift its default
+// MCP-result truncation cap up to the requested character count (max 500_000).
+// We pick 200_000 to comfortably cover the documented byte caps + UTF-8 expansion.
+// Other MCP clients silently ignore the field.
+const MAX_RESULT_SIZE_CHARS = 200_000;
 
 export function createServer(deps: ServerDeps = {}): McpServer {
   const cache = deps.cache ?? new IndexCache();
+  const config = deps.config ?? DEFAULT_CONFIG;
   const server = new McpServer({
     name: "markdown-docs",
     version: "0.1.0",
   });
 
-  const viewTocHandler = makeViewTocHandler(cache);
-  const readSectionHandler = makeReadSectionHandler(cache);
+  const viewTocHandler = makeViewTocHandler(cache, config);
+  const readSectionHandler = makeReadSectionHandler(cache, config);
   const searchHandler = makeSearchHandler(cache);
   const analyzeDocumentHandler = makeAnalyzeDocumentHandler(cache);
 
@@ -44,6 +53,7 @@ export function createServer(deps: ServerDeps = {}): McpServer {
     {
       description: VIEW_TOC_DESCRIPTION,
       inputSchema: viewTocInput,
+      _meta: { "anthropic/maxResultSizeChars": MAX_RESULT_SIZE_CHARS },
     },
     async (args) => viewTocHandler(args)
   );
@@ -53,6 +63,7 @@ export function createServer(deps: ServerDeps = {}): McpServer {
     {
       description: READ_SECTION_DESCRIPTION,
       inputSchema: readSectionInput,
+      _meta: { "anthropic/maxResultSizeChars": MAX_RESULT_SIZE_CHARS },
     },
     async (args) => readSectionHandler(args)
   );

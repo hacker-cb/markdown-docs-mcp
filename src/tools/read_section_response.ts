@@ -2,6 +2,7 @@ import type { Index, TocNode } from "../index/types.js";
 import type { CommentRange } from "../parser/comments.js";
 import type { ReadSectionInput } from "../schemas/inputs.js";
 import { compactTocNodeAtDepth, type CompactTocNode } from "./_compact.js";
+import { DEFAULT_CONFIG } from "../config.js";
 
 export type AbsorbedArtifact = {
   id: string;
@@ -229,14 +230,13 @@ export function truncateAtBytes(
   return { content: truncatedContent, truncated_at_line };
 }
 
-const MAX_BYTES = 200 * 1024; // 204800
-
 /**
  * Main entry point: builds a ReadSectionResponse from an index and input.
  */
 export function buildReadSectionResponse(
   index: Index,
-  input: ReadSectionInput
+  input: ReadSectionInput,
+  maxBytes: number = DEFAULT_CONFIG.maxSectionBytes
 ): ReadSectionResponse {
   // 1. Find node by section_id
   const nodeById = buildNodeMap(index.toc);
@@ -311,8 +311,8 @@ export function buildReadSectionResponse(
     );
   }
 
-  // 6. Truncate at 200 KB
-  const truncResult = truncateAtBytes(content, start_line, index.line_offsets, MAX_BYTES);
+  // 6. Truncate at maxBytes
+  const truncResult = truncateAtBytes(content, start_line, index.line_offsets, maxBytes);
   content = truncResult.content;
 
   // 7. Build children mini-TOC if include_subsections=false and node has children.

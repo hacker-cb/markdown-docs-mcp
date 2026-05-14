@@ -24,6 +24,12 @@ const TRM = resolve(__dirname, "../fixtures/public/esp32-p4-trm.md");
 let sharedCache: IndexCache;
 let sharedClient: Client;
 
+// Force a small view_toc cap so the depth-reduction loop actually fires on the
+// TRM: with the production default (50 KB) the compact JSON of a depth=6 tree
+// already fits without trimming on this fixture, and we would lose coverage of
+// truncated/effective_depth/hint output.
+const STRESS_CAP_BYTES = 5 * 1024;
+
 beforeAll(
   async () => {
     sharedCache = new IndexCache();
@@ -31,7 +37,10 @@ beforeAll(
     await sharedCache.getOrBuild(TRM);
 
     const [ct, st] = InMemoryTransport.createLinkedPair();
-    const server = createServer({ cache: sharedCache });
+    const server = createServer({
+      cache: sharedCache,
+      config: { maxViewTocBytes: STRESS_CAP_BYTES, maxSectionBytes: 200 * 1024 },
+    });
     sharedClient = new Client({ name: "stress-test", version: "0" });
     await Promise.all([server.connect(st), sharedClient.connect(ct)]);
   },
@@ -61,7 +70,7 @@ describe("stress: huge document (ESP32-P4 TRM)", () => {
       const parsed = parse(result);
 
       const jsonBytes = Buffer.byteLength(JSON.stringify(parsed), "utf8");
-      expect(jsonBytes).toBeLessThanOrEqual(25 * 1024);
+      expect(jsonBytes).toBeLessThanOrEqual(STRESS_CAP_BYTES);
       expect(parsed["truncated"]).toBe(true);
       expect(parsed["effective_depth"]).toBeDefined();
       expect(typeof parsed["hint"]).toBe("string");
