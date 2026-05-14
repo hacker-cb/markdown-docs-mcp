@@ -1,6 +1,5 @@
-// MCP server factory. Registers four tools with self-contained descriptions
-// and Zod-validated inputs. view_toc and read_section are fully implemented;
-// search and analyze_document remain stubs (NotImplementedError) until PR-06+.
+// MCP server factory. Registers all four tools with self-contained descriptions
+// and Zod-validated inputs. All tools are fully implemented.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
@@ -17,8 +16,8 @@ import {
 } from "./schemas/descriptions.js";
 import { makeViewTocHandler } from "./tools/view_toc.js";
 import { makeReadSectionHandler } from "./tools/read_section.js";
-import { search } from "./tools/search.js";
-import { analyzeDocument } from "./tools/analyze_document.js";
+import { makeSearchHandler } from "./tools/search.js";
+import { makeAnalyzeDocumentHandler } from "./tools/analyze_document.js";
 import { IndexCache } from "./index/cache.js";
 
 export type ServerDeps = { cache?: IndexCache };
@@ -32,6 +31,8 @@ export function createServer(deps: ServerDeps = {}): McpServer {
 
   const viewTocHandler = makeViewTocHandler(cache);
   const readSectionHandler = makeReadSectionHandler(cache);
+  const searchHandler = makeSearchHandler(cache);
+  const analyzeDocumentHandler = makeAnalyzeDocumentHandler(cache);
 
   // registerTool(name, config, callback) — preferred non-deprecated API in SDK 1.29.
   // inputSchema accepts a full Zod object schema (AnySchema); SDK converts it to
@@ -62,9 +63,7 @@ export function createServer(deps: ServerDeps = {}): McpServer {
       description: SEARCH_DESCRIPTION,
       inputSchema: searchInput,
     },
-    async (args) => {
-      return await search(args);
-    }
+    async (args) => searchHandler(args)
   );
 
   server.registerTool(
@@ -73,9 +72,7 @@ export function createServer(deps: ServerDeps = {}): McpServer {
       description: ANALYZE_DOCUMENT_DESCRIPTION,
       inputSchema: analyzeDocumentInput,
     },
-    async (args) => {
-      return await analyzeDocument(args);
-    }
+    async (args) => analyzeDocumentHandler(args)
   );
 
   return server;
