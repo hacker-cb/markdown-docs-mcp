@@ -27,6 +27,11 @@ export const REPO_ROOT = resolve(__dirname, "..");
 const PKG_NAME = "markdown-docs-mcp";
 const MCP_SERVER_KEY = "markdown-docs";
 
+// Pragmatic subset of semver, not the full spec. Accepts MAJOR.MINOR.PATCH
+// with an optional `-prerelease` suffix limited to [\w.]. Build metadata
+// (`+sha.abc`) and hyphenated prerelease (`-rc-1`) are intentionally
+// rejected — npm tag conventions for this package don't use them, and a
+// stricter regex catches typos that the full spec would silently allow.
 const SEMVER_RE = /^v?(\d+)\.(\d+)\.(\d+)(?:-[\w.]+)?$/;
 
 export function normalizeVersion(input) {
