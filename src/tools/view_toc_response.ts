@@ -47,6 +47,10 @@ function trimAndCompact(nodes: TocNode[], depth: number): CompactTocNode[] {
 /**
  * Builds a flat list from flat_headers for raw=true mode.
  * Each header is represented as a minimal compact node with no children.
+ * FlatHeader carries the real line_end / section_lines populated by
+ * buildIndex after buildTocTree, so raw mode reports the same ranges the
+ * structured tree would — an agent can pivot to read_section without
+ * over-fetching.
  */
 function rawFlatCompact(flat: Index["flat_headers"]): CompactTocNode[] {
   return flat.map((h) => {
@@ -55,8 +59,8 @@ function rawFlatCompact(flat: Index["flat_headers"]): CompactTocNode[] {
       level: h.level,
       title: h.title,
       line: h.line,
-      line_end: h.line, // in raw mode line_end is unknown — set equal to line
-      section_lines: 1,
+      line_end: h.line_end,
+      section_lines: h.section_lines,
     };
     if (h.numbering !== null) {
       node.numbering = h.numbering;

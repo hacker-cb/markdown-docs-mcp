@@ -608,6 +608,12 @@ markdown-docs-mcp/
 - Performance benchmarks в CI как gating condition (smoke-tests только).
 - Обёртки для других платформ (Cursor extension, Copilot CLI plugin, Gemini CLI extension и т.п.). Сам MCP-сервер уже работает с любым MCP-совместимым клиентом через стандартный stdio — никаких изменений в коде сервера не потребуется. Платформенные обёртки (аналог нашего Claude plugin) — отдельная работа, выполняется по мере появления спроса.
 
+Отложено как known limitations (вылавливать когда понадобится, не сейчас) — выявлено в полном code review перед первым релизом:
+
+- **Regex DoS surface в search.** Пользовательский regex (через model-supplied query) выполняется на всех строках документа (до 143k на TRM). Pathological pattern с nested quantifiers зависнет thread без возможности отмены. Mitigation — depend on `re2` (linear-time engine) или wall-clock budget + per-line `setImmediate` paced loop. Пока не наблюдалось на practical fixtures.
+- **Concurrent `getOrBuild` race в LRU-кэше.** Две одновременные tool-call'ы на свежевыселенный файл оба миссят, оба строят индекс end-to-end (90-120 s на TRM), второй перезаписывает первый. Stdio MCP обычно single-flight, но parallel-aware clients (`Promise.all([...])`) могут попасть. Fix — `Map<string, Promise<Index>>` в кэше.
+- **`stripComments` O(lines × ranges).** При section cap > 200 KB и тысячах PDF-маркеров комментариев деградирует. Сейчас маскируется тем что cap держит inner loop коротким. Fix — two-pointer walk или pre-computed boolean line-flag array.
+
 ## 14. Открытые вопросы
 
 Все ключевые решения зафиксированы в этом spec'е. Открытых архитектурных вопросов на момент написания нет. Технические детали реализации (точный формат marketplace.json, конкретные esbuild опции, выбор библиотеки для frontmatter parsing) решаются в плане реализации.
@@ -635,6 +641,8 @@ markdown-docs-mcp/
 - [x] **PR-06.3: cap-fix + env config + maxResultSizeChars** — compact JSON во всех 4 tools (cap и output теперь меряются на одном представлении), env-vars `MARKDOWN_DOCS_MAX_TOC_BYTES` / `MARKDOWN_DOCS_MAX_SECTION_BYTES` для override (defaults 50 / 200 KB, ceiling 500 KB), Claude Code `_meta["anthropic/maxResultSizeChars"]: 200000` annotation на view_toc и read_section.
 
 - [x] **PR-07: Plugin packaging** — `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `.mcp.json` (запускает npm-пакет через `npx -y markdown-docs-mcp@<version>`), cross-file invariants test. Skill решено не отгружать (см. section 8). Manual smoke test через `/plugin marketplace add hacker-cb/markdown-docs-mcp`.
+
+- [x] **PR-09: Code-review follow-up** — закрывает 2 Critical + 1 Important + 1 Minor находки полного project-wide review (catch-up для 11 PR'ов до Copilot integration). `src/server.ts` теперь читает version из package.json (атомарность 5-го источника), `viewToc`/`readSection` descriptions интерполируют real cap из config (вместо устаревшего hardcoded "25 KB"), raw-mode `view_toc` отдаёт реальные `line_end`/`section_lines` через расширенный `FlatHeader`. Отложенные finds (regex DoS, cache race, stripComments perf) задокументированы в section 13.
 
 - [x] **PR-08: Release pipeline** — `scripts/release.mjs` (атомарная синхронизация версий в 4 файлах), `.github/workflows/release.yml` (test + build + `npm publish --provenance` через Trusted Publisher OIDC + GitHub Release), pure-transform unit-тесты на release-script, README с актуальной installation секцией. Trusted Publisher настройка на npmjs.com выполняется автором разово вне репо.
 

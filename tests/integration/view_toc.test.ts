@@ -20,6 +20,9 @@ interface TocNode {
   id: string;
   level: number;
   title: string;
+  line: number;
+  line_end: number;
+  section_lines: number;
   children?: TocNode[];         // omitted when empty (compact form)
   is_likely_artifact?: true;    // omitted when false (compact form)
   has_children?: true;          // present only when children were trimmed by depth cap
@@ -127,6 +130,32 @@ describe("view_toc integration", () => {
       }
     },
     30000
+  );
+
+  it(
+    "raw=true reports real line_end / section_lines (not placeholders)",
+    async () => {
+      // Regression guard for PR-09: before this fix, rawFlatCompact emitted
+      // line_end === line and section_lines === 1 for every node, which made
+      // raw-mode TOC misleading for any agent that pivoted to read_section.
+      const { client, close } = await makeClient();
+      openClients.push({ close });
+      const result = await client.callTool({
+        name: "view_toc",
+        arguments: { file_path: STM32, raw: true },
+      });
+      const parsed = parseToc(result);
+
+      // Every node's section_lines must be consistent with its range.
+      for (const node of parsed.toc) {
+        expect(node.section_lines).toBe(node.line_end - node.line + 1);
+      }
+      // At least one non-leaf header on a real datasheet must own more
+      // than a single line of content. STM32 has plenty.
+      const meaty = parsed.toc.filter((n) => n.line_end > n.line);
+      expect(meaty.length).toBeGreaterThan(0);
+    },
+    60000
   );
 
   it("invalid file_path causes tool error", async () => {

@@ -6,7 +6,7 @@ import { extractNumbering } from "../parser/numbering.js";
 import { parsePdfPageMarkers } from "../parser/pdf_pages.js";
 import { buildTocTree } from "./reparenting.js";
 import { detectAnomalies } from "../anomalies/detector.js";
-import type { FlatHeader, Index, TocNode } from "./types.js";
+import type { FlatHeader, FlatSeed, Index, TocNode } from "./types.js";
 
 function stripBOM(s: string): string {
   return s.length > 0 && s.charCodeAt(0) === 0xfeff ? s.slice(1) : s;
@@ -38,7 +38,12 @@ export async function buildIndex(filePath: string): Promise<Index> {
   const headingsInBody = extractHeadings(fm.body);
   const bodyOffset = fm.body_start_line - 1;
 
-  const flat: FlatHeader[] = headingsInBody.map((h) => {
+  // Two-phase flat construction. We need a minimal flat list to build the
+  // toc tree (which is what assigns line_end / section_lines to each node),
+  // then we walk the resulting tree to enrich flat[] with those fields. The
+  // walk preserves document order so flat[i] still lines up with the i-th
+  // heading in the source.
+  const flatSeeds: FlatSeed[] = headingsInBody.map((h) => {
     const absoluteLine = h.line + bodyOffset;
     return {
       id: `s${absoluteLine}`,
@@ -52,7 +57,35 @@ export async function buildIndex(filePath: string): Promise<Index> {
   const comment_ranges = findCommentRanges(raw);
   const line_offsets = computeLineOffsets(raw);
   const line_count = line_offsets.length;
-  const toc = buildTocTree(flat, line_count);
+  const toc = buildTocTree(flatSeeds, line_count);
+
+  // Walk the tree in document order, collecting line_end / section_lines.
+  // Both reparenting and raw flat preserve document order, so the recovered
+  // ranges align with the seed array by id.
+  const ranges = new Map<string, { line_end: number; section_lines: number }>();
+  function collectRanges(nodes: TocNode[]): void {
+    for (const node of nodes) {
+      ranges.set(node.id, {
+        line_end: node.line_end,
+        section_lines: node.section_lines,
+      });
+      collectRanges(node.children);
+    }
+  }
+  collectRanges(toc);
+  // Every seed id must appear in the tree by construction (buildTocTree
+  // consumes the same seeds it labels). A miss here would mean the tree
+  // dropped a node — silently falling back to the line-only placeholder
+  // would resurrect exactly the bug this enrichment exists to prevent.
+  const flat: FlatHeader[] = flatSeeds.map((seed) => {
+    const r = ranges.get(seed.id);
+    if (r === undefined) {
+      throw new Error(
+        `Internal invariant violation: TocNode for FlatSeed id "${seed.id}" (line ${seed.line}) not found in tree. buildTocTree likely dropped a header.`
+      );
+    }
+    return { ...seed, ...r };
+  });
 
   // Step 1: parse PDF page markers (needed for adjacent_pdf_markers in anomaly detection)
   const pdf_markers = parsePdfPageMarkers(raw);

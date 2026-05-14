@@ -4,7 +4,7 @@ MCP server for efficient navigation of large markdown documents — datasheets, 
 
 Lets agents read what they need from a 100 000+ line markdown file without dumping the whole thing into context.
 
-> Status: under active development before first release. See [docs/superpowers/specs/](docs/superpowers/specs/) for the design.
+See [docs/superpowers/specs/](docs/superpowers/specs/) for the design.
 
 ## Tools
 

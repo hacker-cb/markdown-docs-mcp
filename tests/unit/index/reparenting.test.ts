@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { buildTocTree } from "../../../src/index/reparenting.js";
-import type { FlatHeader } from "../../../src/index/types.js";
+import type { FlatSeed } from "../../../src/index/types.js";
 
-const mkFlat = (line: number, level: number, title: string): FlatHeader => ({
+const mkFlat = (line: number, level: number, title: string): FlatSeed => ({
   id: `s${line}`,
-  level: level as FlatHeader["level"],
+  level: level as FlatSeed["level"],
   title,
   numbering: null,
   line,

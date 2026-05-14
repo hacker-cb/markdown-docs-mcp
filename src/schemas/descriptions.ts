@@ -2,17 +2,30 @@
 // agent use the server correctly even without the bundled skill (e.g. when
 // the MCP is connected directly without the Claude Code plugin, or from
 // Cursor/Continue/any other MCP client).
+//
+// Caps are interpolated from the active Config so the description tells the
+// agent the truth even when an env var raised or lowered the default. The
+// previous static "25 KB" string drifted after PR-06.3 bumped the default to
+// 50 KB — interpolation prevents that class of bug.
 
-export const VIEW_TOC_DESCRIPTION = `Returns the table of contents of a large markdown file as a tree of headings.
+import type { Config } from "../config.js";
+
+function formatKB(bytes: number): string {
+  return `${Math.round(bytes / 1024)} KB`;
+}
+
+export function viewTocDescription(config: Config): string {
+  const cap = formatKB(config.maxViewTocBytes);
+  return `Returns the table of contents of a large markdown file as a tree of headings.
 
 Typical workflow:
-1. view_toc(file_path) — get document overview (server-capped at 25 KB).
+1. view_toc(file_path) — get document overview (server-capped at ${cap}).
 2. Pick a node by id from toc[]. Nodes with has_children=true have deeper structure that was not included in this response.
 3. To explore deeper: view_toc(file_path, start_id) for the subtree, or read_section(file_path, section_id) to read content + a children mini-TOC.
 
 Each node has: opaque id (format: s<line>), level (1-6), title, optional numbering ("4.1.2"), line/line_end range, section size in lines. Fields is_likely_artifact, has_children, and children are omitted when their default values apply (false / not trimmed / empty). has_children=true (only present when children were trimmed by the depth cap) signals that the node has deeper structure not included in this response. The response includes file metadata, optional YAML frontmatter, and anomalies_summary.
 
-For very large documents the server auto-reduces depth to keep the response under 25 KB and sets truncated=true, effective_depth=N, and hint="Tree trimmed from depth D to N; use start_id=<id> to drill deeper." When even depth=1 is too large, a prefix of root nodes is returned with a matching hint. Use start_id to navigate into a subtree: pass an id from a previous view_toc call and toc[] will contain that node's immediate children.
+For very large documents the server auto-reduces depth to keep the response under ${cap} and sets truncated=true, effective_depth=N, and hint="Tree trimmed from depth D to N; use start_id=<id> to drill deeper." When even depth=1 is too large, a prefix of root nodes is returned with a matching hint. Use start_id to navigate into a subtree: pass an id from a previous view_toc call and toc[] will contain that node's immediate children.
 
 Use this as the entry point when reading any markdown document larger than ~500 lines. The response is bounded in size regardless of file size, and lets you address sections by opaque id without reading the whole file.
 
@@ -21,8 +34,11 @@ If anomalies_summary.total > 0, the document has structural anomalies (most ofte
 Section ids are opaque (format s<line>); do not construct them from numbering. Use read_section({ section_id }) to read content for a specific id. The default reading mode is "raw" — every line of the document belongs to exactly one node, no content is silently merged or dropped by heuristics.
 
 Pass raw=true to skip reparenting and is_likely_artifact flags entirely (debug/transparency).`;
+}
 
-export const READ_SECTION_DESCRIPTION = `Reads a section of a markdown document by its opaque id from view_toc.
+export function readSectionDescription(config: Config): string {
+  const cap = formatKB(config.maxSectionBytes);
+  return `Reads a section of a markdown document by its opaque id from view_toc.
 
 Default mode="raw": returns literal parser boundaries — the text from the heading line to line_end. No heuristic-driven expansion. If include_subsections=false (default), content stops at the first child heading and a mini-TOC of children is returned in the response so you can drill down stepwise.
 
@@ -30,9 +46,10 @@ Mode="logical" is opt-in: extends the section past adjacent is_likely_artifact n
 
 HTML comments (<!-- ... -->) are stripped from content by default; pass include_comments=true to keep them. Line numbers in the response stay absolute regardless.
 
-Response is hard-capped at ~200 KB. Larger sections return truncated=true with truncated_at_line=N — use from_line=N+1 to continue reading.
+Response is hard-capped at ~${cap}. Larger sections return truncated=true with truncated_at_line=N — use from_line=N+1 to continue reading.
 
 Errors: invalid section_id returns a list of close-by ids to help recovery.`;
+}
 
 export const SEARCH_DESCRIPTION = `Searches a markdown document for literal substrings or regex.
 
