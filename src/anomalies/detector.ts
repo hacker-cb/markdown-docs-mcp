@@ -43,7 +43,7 @@ export function detectAnomalies(index: Index): Anomaly[] {
       .reverse()
       .find((a) => normalizeWhitespace(a.title) === normalizedTitle);
     if (dup) {
-      const i = flat.findIndex((h) => h.id === node.id);
+      const i = index.flat_index_by_id.get(node.id) ?? -1;
       const preceding = i > 0 ? flat[i - 1] : undefined;
       const following = i + 1 < flat.length ? flat[i + 1] : undefined;
       push({

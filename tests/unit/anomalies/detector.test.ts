@@ -25,7 +25,7 @@ function mkIndex(opts: {
     anomalies: [],
     pdf_markers: opts.pdf_markers ?? [],
     node_by_id: new Map(),
-    flat_index_by_id: new Map(),
+    flat_index_by_id: new Map(opts.flat.map((h, i) => [h.id, i])),
     line_section_map: [],
   };
 }
