@@ -4,22 +4,13 @@ import { findCommentRanges } from "../parser/comments.js";
 import { parseFrontmatter } from "../parser/frontmatter.js";
 import { extractNumbering } from "../parser/numbering.js";
 import { parsePdfPageMarkers } from "../parser/pdf_pages.js";
+import { computeLineOffsets } from "../parser/_line_offsets.js";
 import { buildTocTree } from "./reparenting.js";
 import { detectAnomalies } from "../anomalies/detector.js";
 import type { FlatHeader, FlatSeed, Index, TocNode } from "./types.js";
 
 function stripBOM(s: string): string {
   return s.length > 0 && s.charCodeAt(0) === 0xfeff ? s.slice(1) : s;
-}
-
-function computeLineOffsets(content: string): number[] {
-  const offsets: number[] = [0];
-  for (let i = 0; i < content.length; i++) {
-    if (content.charCodeAt(i) === 10) {
-      offsets.push(i + 1);
-    }
-  }
-  return offsets;
 }
 
 function findNodeById(nodes: TocNode[], id: string): TocNode | undefined {
@@ -35,6 +26,11 @@ export async function buildIndex(filePath: string): Promise<Index> {
   const stats = await stat(filePath);
   const raw = stripBOM(await readFile(filePath, "utf8"));
   const fm = parseFrontmatter(raw);
+
+  // Compute line_offsets up front — both parsers will use it for O(log N) line lookup.
+  const line_offsets = computeLineOffsets(raw);
+  const line_count = line_offsets.length;
+
   const headingsInBody = extractHeadings(fm.body);
   const bodyOffset = fm.body_start_line - 1;
 
@@ -55,8 +51,6 @@ export async function buildIndex(filePath: string): Promise<Index> {
   });
 
   const comment_ranges = findCommentRanges(raw);
-  const line_offsets = computeLineOffsets(raw);
-  const line_count = line_offsets.length;
   const toc = buildTocTree(flatSeeds, line_count);
 
   // Walk the tree in document order, collecting line_end / section_lines.
