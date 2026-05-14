@@ -1,6 +1,8 @@
 {
   "name": "hacker-cb",
-  "owner": { "name": "hacker-cb" },
+  "owner": {
+    "name": "hacker-cb"
+  },
   "plugins": [
     {
       "name": "markdown-docs",
