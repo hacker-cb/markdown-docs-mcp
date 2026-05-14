@@ -1,6 +1,9 @@
 // MCP server factory. Registers all four tools with self-contained descriptions
 // and Zod-validated inputs. All tools are fully implemented.
 
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   viewTocInput,
@@ -9,8 +12,8 @@ import {
   analyzeDocumentInput,
 } from "./schemas/inputs.js";
 import {
-  VIEW_TOC_DESCRIPTION,
-  READ_SECTION_DESCRIPTION,
+  viewTocDescription,
+  readSectionDescription,
   SEARCH_DESCRIPTION,
   ANALYZE_DOCUMENT_DESCRIPTION,
 } from "./schemas/descriptions.js";
@@ -30,12 +33,27 @@ export type ServerDeps = { cache?: IndexCache; config?: Config };
 // Other MCP clients silently ignore the field.
 const MAX_RESULT_SIZE_CHARS = 200_000;
 
+// Read version from package.json at startup so the MCP server name+version
+// reported to clients always matches the npm-published artifact. The script
+// in scripts/release.mjs treats package.json as the single source of truth;
+// hard-coding here would create a fifth drift surface.
+//
+// Resolves the same way in both layouts:
+//   - dev / tsx:    src/server.ts → ../package.json (repo root)
+//   - npm install:  node_modules/markdown-docs-mcp/dist/index.js → ../package.json
+function readPackageVersion(): string {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const pkgPath = resolve(here, "..", "package.json");
+  const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as { version: string };
+  return pkg.version;
+}
+
 export function createServer(deps: ServerDeps = {}): McpServer {
   const cache = deps.cache ?? new IndexCache();
   const config = deps.config ?? DEFAULT_CONFIG;
   const server = new McpServer({
     name: "markdown-docs",
-    version: "0.1.0",
+    version: readPackageVersion(),
   });
 
   const viewTocHandler = makeViewTocHandler(cache, config);
@@ -51,7 +69,7 @@ export function createServer(deps: ServerDeps = {}): McpServer {
   server.registerTool(
     "view_toc",
     {
-      description: VIEW_TOC_DESCRIPTION,
+      description: viewTocDescription(config),
       inputSchema: viewTocInput,
       _meta: { "anthropic/maxResultSizeChars": MAX_RESULT_SIZE_CHARS },
     },
@@ -61,7 +79,7 @@ export function createServer(deps: ServerDeps = {}): McpServer {
   server.registerTool(
     "read_section",
     {
-      description: READ_SECTION_DESCRIPTION,
+      description: readSectionDescription(config),
       inputSchema: readSectionInput,
       _meta: { "anthropic/maxResultSizeChars": MAX_RESULT_SIZE_CHARS },
     },

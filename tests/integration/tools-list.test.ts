@@ -2,9 +2,17 @@
 // Verifies tools/list returns exactly 4 tools with correct names, descriptions, and schemas.
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createServer } from "../../src/server.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const PKG_VERSION = JSON.parse(
+  readFileSync(resolve(__dirname, "../../package.json"), "utf8")
+).version as string;
 
 const EXPECTED_TOOLS = ["analyze_document", "read_section", "search", "view_toc"];
 
@@ -26,6 +34,17 @@ describe("tools/list", () => {
   it("returns exactly 4 tools", async () => {
     const { tools } = await client.listTools();
     expect(tools).toHaveLength(4);
+  });
+
+  it("MCP server reports the same version as package.json (no fifth drift surface)", () => {
+    // scripts/release.mjs syncs four files (package.json, plugin.json,
+    // marketplace.json, .mcp.json). The server name+version reported on
+    // every initialize MUST match — otherwise the npm artifact and the
+    // advertised version disagree, defeating the atomic-sync apparatus.
+    // Use the MCP `initialize` response shape exposed by the SDK client.
+    const info = client.getServerVersion();
+    expect(info?.name).toBe("markdown-docs");
+    expect(info?.version).toBe(PKG_VERSION);
   });
 
   it("tool names match the expected set", async () => {

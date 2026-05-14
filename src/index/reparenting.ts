@@ -1,6 +1,6 @@
-import type { FlatHeader, TocNode } from "./types.js";
+import type { FlatSeed, TocNode } from "./types.js";
 
-export function buildTocTree(headers: FlatHeader[], totalLines: number): TocNode[] {
+export function buildTocTree(headers: FlatSeed[], totalLines: number): TocNode[] {
   const roots: TocNode[] = [];
   const stack: TocNode[] = [];
 

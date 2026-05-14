@@ -15,12 +15,23 @@ export type TocNode = {
   children: TocNode[];
 };
 
-export type FlatHeader = {
+/**
+ * Minimal heading info known before the toc tree is built — what the parser
+ * extracts directly from headings. Reparenting consumes this shape; once the
+ * tree is built, builder.ts derives line_end / section_lines from the tree
+ * and constructs the full FlatHeader.
+ */
+export type FlatSeed = {
   id: string;
   level: 1 | 2 | 3 | 4 | 5 | 6;
   title: string;
   numbering: string | null;
   line: number;
+};
+
+export type FlatHeader = FlatSeed & {
+  line_end: number;
+  section_lines: number;
 };
 
 export type Index = {

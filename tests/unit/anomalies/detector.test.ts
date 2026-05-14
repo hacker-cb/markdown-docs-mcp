@@ -46,6 +46,25 @@ const mkNode = (
   children,
 });
 
+// detector input fixtures need only the heading-line info plus minimal ranges
+// (line_end + section_lines were added to FlatHeader for view_toc raw mode).
+// Tests don't exercise those fields directly, so synthesize them from line.
+const mkFlat = (
+  id: string,
+  level: FlatHeader["level"],
+  title: string,
+  line: number,
+  numbering: string | null = null
+): FlatHeader => ({
+  id,
+  level,
+  title,
+  numbering,
+  line,
+  line_end: line,
+  section_lines: 1,
+});
+
 describe("detectAnomalies", () => {
   it("detects self_nesting_header when title duplicates open ancestor", () => {
     // root "Foo" -> child h2 -> grandchild "Foo" again (same title as root)
@@ -53,9 +72,9 @@ describe("detectAnomalies", () => {
     const child = mkNode("s3", 2, "Bar", 3, 7, [grandchild]);
     const root = mkNode("s1", 1, "Foo", 1, 7, [child]);
     const flat: FlatHeader[] = [
-      { id: "s1", level: 1, title: "Foo", numbering: null, line: 1 },
-      { id: "s3", level: 2, title: "Bar", numbering: null, line: 3 },
-      { id: "s5", level: 3, title: "Foo", numbering: null, line: 5 },
+      mkFlat("s1", 1, "Foo", 1),
+      mkFlat("s3", 2, "Bar", 3),
+      mkFlat("s5", 3, "Foo", 5),
     ];
     const result = detectAnomalies(mkIndex({ toc: [root], flat, line_count: 10 }));
     const selfNesting = result.filter((a) => a.type === "self_nesting_header");
@@ -74,10 +93,10 @@ describe("detectAnomalies", () => {
     const b1 = mkNode("s9", 2, "Examples", 9, 10);
     const b = mkNode("s7", 1, "Annex B", 7, 10, [b1]);
     const flat: FlatHeader[] = [
-      { id: "s3", level: 1, title: "Annex A", numbering: null, line: 3 },
-      { id: "s5", level: 2, title: "Examples", numbering: null, line: 5 },
-      { id: "s7", level: 1, title: "Annex B", numbering: null, line: 7 },
-      { id: "s9", level: 2, title: "Examples", numbering: null, line: 9 },
+      mkFlat("s3", 1, "Annex A", 3),
+      mkFlat("s5", 2, "Examples", 5),
+      mkFlat("s7", 1, "Annex B", 7),
+      mkFlat("s9", 2, "Examples", 9),
     ];
     const result = detectAnomalies(mkIndex({ toc: [a, b], flat, line_count: 10 }));
     expect(result.filter((a) => a.type === "self_nesting_header")).toHaveLength(0);
@@ -86,7 +105,7 @@ describe("detectAnomalies", () => {
   it("detects orphan_subheader when first heading level > 1", () => {
     const node = mkNode("s1", 2, "H2", 1, 5);
     const flat: FlatHeader[] = [
-      { id: "s1", level: 2, title: "H2", numbering: null, line: 1 },
+      mkFlat("s1", 2, "H2", 1),
     ];
     const result = detectAnomalies(mkIndex({ toc: [node], flat, line_count: 5 }));
     expect(result.filter((a) => a.type === "orphan_subheader")).toHaveLength(1);
@@ -94,8 +113,8 @@ describe("detectAnomalies", () => {
 
   it("detects level_jump in flat headers (gap > 1)", () => {
     const flat: FlatHeader[] = [
-      { id: "s1", level: 1, title: "A", numbering: null, line: 1 },
-      { id: "s3", level: 3, title: "B", numbering: null, line: 3 },
+      mkFlat("s1", 1, "A", 1),
+      mkFlat("s3", 3, "B", 3),
     ];
     const a = mkNode("s1", 1, "A", 1, 4, [mkNode("s3", 3, "B", 3, 4)]);
     const result = detectAnomalies(mkIndex({ toc: [a], flat, line_count: 4 }));
@@ -107,7 +126,7 @@ describe("detectAnomalies", () => {
   it("detects empty_section when line_end equals line", () => {
     const node = mkNode("s1", 1, "Empty", 1, 1);
     const flat: FlatHeader[] = [
-      { id: "s1", level: 1, title: "Empty", numbering: null, line: 1 },
+      mkFlat("s1", 1, "Empty", 1),
     ];
     const result = detectAnomalies(mkIndex({ toc: [node], flat, line_count: 5 }));
     expect(result.filter((a) => a.type === "empty_section")).toHaveLength(1);
@@ -115,8 +134,8 @@ describe("detectAnomalies", () => {
 
   it("detects consecutive_pair_header for 'Chapter 5' + 'Title'", () => {
     const flat: FlatHeader[] = [
-      { id: "s1", level: 1, title: "Chapter 5", numbering: "5", line: 1 },
-      { id: "s3", level: 1, title: "GDMA Controller", numbering: null, line: 3 },
+      mkFlat("s1", 1, "Chapter 5", 1, "5"),
+      mkFlat("s3", 1, "GDMA Controller", 3),
     ];
     const tree = [
       mkNode("s1", 1, "Chapter 5", 1, 2),
@@ -137,8 +156,8 @@ describe("detectAnomalies", () => {
 
   it("does not match content-rich headings starting with 'Chapter'", () => {
     const flat: FlatHeader[] = [
-      { id: "s1", level: 1, title: "Chapter 5: Architecture", numbering: null, line: 1 },
-      { id: "s3", level: 1, title: "Overview", numbering: null, line: 3 },
+      mkFlat("s1", 1, "Chapter 5: Architecture", 1),
+      mkFlat("s3", 1, "Overview", 3),
     ];
     const result = detectAnomalies(
       mkIndex({
@@ -152,8 +171,8 @@ describe("detectAnomalies", () => {
 
   it("recognizes Roman numerals (Part I, Part II)", () => {
     const flat: FlatHeader[] = [
-      { id: "s1", level: 1, title: "Part I", numbering: null, line: 1 },
-      { id: "s2", level: 1, title: "Microprocessor and Master", numbering: null, line: 2 },
+      mkFlat("s1", 1, "Part I", 1),
+      mkFlat("s2", 1, "Microprocessor and Master", 2),
     ];
     const result = detectAnomalies(
       mkIndex({
@@ -167,8 +186,8 @@ describe("detectAnomalies", () => {
 
   it("does not match when headers are too far apart (> 3 lines)", () => {
     const flat: FlatHeader[] = [
-      { id: "s1", level: 1, title: "Chapter 5", numbering: "5", line: 1 },
-      { id: "s10", level: 1, title: "Something", numbering: null, line: 10 },
+      mkFlat("s1", 1, "Chapter 5", 1, "5"),
+      mkFlat("s10", 1, "Something", 10),
     ];
     const result = detectAnomalies(
       mkIndex({
@@ -185,9 +204,9 @@ describe("detectAnomalies", () => {
     const child = mkNode("s3", 2, "Bar", 3, 7, [grandchild]);
     const root = mkNode("s1", 1, "Foo", 1, 7, [child]);
     const flat: FlatHeader[] = [
-      { id: "s1", level: 1, title: "Foo", numbering: null, line: 1 },
-      { id: "s3", level: 2, title: "Bar", numbering: null, line: 3 },
-      { id: "s5", level: 3, title: "Foo", numbering: null, line: 5 },
+      mkFlat("s1", 1, "Foo", 1),
+      mkFlat("s3", 2, "Bar", 3),
+      mkFlat("s5", 3, "Foo", 5),
     ];
     const result = detectAnomalies(
       mkIndex({
