@@ -600,7 +600,7 @@ markdown-docs-mcp/
 
 - [x] **PR-02: MCP server skeleton** — stdio entry (`src/index.ts`), Zod schemas (`src/schemas/`), регистрация четырёх tools через стандартный `tools/list`. Tools возвращают `not_implemented` error до своей очереди. Базовый JSON-RPC integration test (handshake + список tools).
 
-- [ ] **PR-03: Parser + indexing core** — `src/parser/*` (markdown-it wrapper, comments, frontmatter, numbering), `src/index/*` (builder, LRU cache, reparenting). Unit-тесты на inline-фикстурах. Tools всё ещё возвращают `not_implemented`.
+- [x] **PR-03: Parser + indexing core** — `src/parser/*` (markdown-it wrapper, comments, frontmatter, numbering), `src/index/*` (builder, LRU cache, reparenting). Unit-тесты на inline-фикстурах. Tools всё ещё возвращают `not_implemented`.
 
 - [ ] **PR-04: view_toc + anomalies** — реализация `view_toc` tool (включая `pdf_pages` в metadata), anomalies detector (`self_nesting_header`, `level_jump`, `orphan_subheader`, `empty_section`). Integration test на public fixtures + line-coverage invariant («no content loss»).
 

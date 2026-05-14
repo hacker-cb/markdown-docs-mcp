@@ -38,6 +38,7 @@
     "url": "https://github.com/hacker-cb/markdown-docs-mcp/issues"
   },
   "devDependencies": {
+    "@types/markdown-it": "14.1.2",
     "@types/node": "25.7.0",
     "esbuild": "0.28.0",
     "tsx": "4.21.0",
@@ -51,6 +52,9 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.29.0",
+    "gray-matter": "4.0.3",
+    "lru-cache": "11.3.6",
+    "markdown-it": "14.1.1",
     "zod": "4.4.3"
   }
 }
