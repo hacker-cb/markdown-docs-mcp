@@ -73,8 +73,17 @@ export async function buildIndex(filePath: string): Promise<Index> {
     }
   }
   collectRanges(toc);
+  // Every seed id must appear in the tree by construction (buildTocTree
+  // consumes the same seeds it labels). A miss here would mean the tree
+  // dropped a node — silently falling back to the line-only placeholder
+  // would resurrect exactly the bug this enrichment exists to prevent.
   const flat: FlatHeader[] = flatSeeds.map((seed) => {
-    const r = ranges.get(seed.id) ?? { line_end: seed.line, section_lines: 1 };
+    const r = ranges.get(seed.id);
+    if (r === undefined) {
+      throw new Error(
+        `Internal invariant violation: TocNode for FlatSeed id "${seed.id}" (line ${seed.line}) not found in tree. buildTocTree likely dropped a header.`
+      );
+    }
     return { ...seed, ...r };
   });
 
