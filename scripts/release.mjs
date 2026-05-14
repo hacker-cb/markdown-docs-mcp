@@ -64,11 +64,18 @@ export function applyVersionToFiles(version, files) {
   if (!market || !Array.isArray(market.plugins) || market.plugins.length === 0) {
     throw new Error(".claude-plugin/marketplace.json missing or has no plugins[]");
   }
+  // Hard assert: we ship a single-plugin marketplace. If a second entry is
+  // added later, the silent-drift this script exists to prevent would
+  // reappear (later entries would keep their old version). Fail loudly so
+  // the maintainer revisits the strategy instead of silently shipping stale.
+  if (market.plugins.length !== 1) {
+    throw new Error(
+      `.claude-plugin/marketplace.json: expected exactly 1 plugin entry, found ${market.plugins.length}. Extend release.mjs before adding more.`
+    );
+  }
   out[".claude-plugin/marketplace.json"] = {
     ...market,
-    plugins: market.plugins.map((p, i) =>
-      i === 0 ? { ...p, version: v } : p
-    ),
+    plugins: [{ ...market.plugins[0], version: v }],
   };
 
   const mcp = files[".mcp.json"];
@@ -103,8 +110,7 @@ function readJson(rel) {
 }
 
 function writeJson(rel, value) {
-  const isPackageJson = rel === "package.json";
-  const text = JSON.stringify(value, null, 2) + (isPackageJson ? "\n" : "\n");
+  const text = JSON.stringify(value, null, 2) + "\n";
   writeFileSync(resolve(REPO_ROOT, rel), text);
 }
 
@@ -132,16 +138,6 @@ function main(argv) {
     process.exit(2);
   }
   const version = normalizeVersion(positional[0]);
-
-  if (!force) {
-    const branch = currentBranch();
-    if (branch !== "master") {
-      console.error(
-        `Refusing to release from branch "${branch}". Switch to master, or pass --force for a rehearsal.`
-      );
-      process.exit(2);
-    }
-  }
 
   const paths = [
     "package.json",
@@ -172,6 +168,29 @@ function main(argv) {
       console.log();
     }
     return;
+  }
+
+  // Wet run only: enforce master branch and a clean working tree before
+  // touching files. (Dry-run is allowed from any branch and ignores tree
+  // state — its job is to preview, not to mutate.)
+  if (!force) {
+    const branch = currentBranch();
+    if (branch !== "master") {
+      console.error(
+        `Refusing to release from branch "${branch}". Switch to master, or pass --force for a rehearsal.`
+      );
+      process.exit(2);
+    }
+  }
+  const dirty = execSync("git status --porcelain", { cwd: REPO_ROOT })
+    .toString()
+    .trim();
+  if (dirty !== "") {
+    console.error(
+      "Working tree is not clean. Commit, stash, or discard the changes below before releasing:\n\n" +
+        dirty
+    );
+    process.exit(2);
   }
 
   for (const p of paths) writeJson(p, after[p]);

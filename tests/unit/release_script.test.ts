@@ -91,6 +91,18 @@ describe("applyVersionToFiles", () => {
     expect(() => applyVersionToFiles("1.0.0", broken)).toThrow(/plugins\[\]/);
   });
 
+  it("throws if marketplace.json contains more than one plugin (drift guard)", () => {
+    // The single-plugin shape is load-bearing — if a second entry sneaks in,
+    // its version would silently drift behind. Fail loudly instead so the
+    // maintainer extends release.mjs deliberately.
+    const broken = sampleFiles();
+    broken[".claude-plugin/marketplace.json"].plugins = [
+      { name: "markdown-docs", source: "./", version: "0.1.0" },
+      { name: "other", source: "./other", version: "0.1.0" },
+    ];
+    expect(() => applyVersionToFiles("1.0.0", broken)).toThrow(/exactly 1 plugin/);
+  });
+
   it("rejects invalid version", () => {
     expect(() => applyVersionToFiles("not-semver", sampleFiles())).toThrow();
   });
