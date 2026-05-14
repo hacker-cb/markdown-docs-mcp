@@ -32,7 +32,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/hacker-cb/markdown-docs-mcp.git"
+    "url": "git+https://github.com/hacker-cb/markdown-docs-mcp.git"
   },
   "homepage": "https://github.com/hacker-cb/markdown-docs-mcp",
   "bugs": {
