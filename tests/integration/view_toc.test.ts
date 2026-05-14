@@ -20,8 +20,8 @@ interface TocNode {
   id: string;
   level: number;
   title: string;
-  children: TocNode[];
-  is_likely_artifact: boolean;
+  children?: TocNode[];         // omitted when empty (compact form)
+  is_likely_artifact?: true;    // omitted when false (compact form)
 }
 
 interface ViewTocResponse {
@@ -100,7 +100,8 @@ describe("view_toc integration", () => {
       });
       const parsed = parseToc(result);
       for (const node of parsed.toc) {
-        expect(node.children).toEqual([]);
+        // depth=1 means no children returned; compact form omits the field entirely
+        expect(node.children).toBeUndefined();
       }
     },
     60000
@@ -118,7 +119,8 @@ describe("view_toc integration", () => {
       const parsed = parseToc(result);
       expect(parsed.anomalies_summary.total).toBe(0);
       for (const node of parsed.toc) {
-        expect(node.children).toEqual([]);
+        // raw mode flat list — no children (compact form omits the field)
+        expect(node.children).toBeUndefined();
       }
     },
     30000

@@ -352,6 +352,6 @@ describe("buildSearchResponse – preamble section", () => {
     expect(hit.section.id).toBe("");
     expect(hit.section.title).toBe("(document preamble)");
     expect(hit.section.level).toBe(0);
-    expect(hit.section.numbering).toBeNull();
+    expect(hit.section.numbering).toBeUndefined(); // null numbering is omitted in compact form
   });
 });

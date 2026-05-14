@@ -1,7 +1,8 @@
-import type { Index, TocNode, FlatHeader } from "../index/types.js";
+import type { Index, TocNode } from "../index/types.js";
 import type { ViewTocInput } from "../schemas/inputs.js";
+import { compactTocNode, type CompactTocNode } from "./_compact.js";
 
-type ResponseTocNode = Omit<TocNode, "children"> & { children: ResponseTocNode[] };
+const MAX_VIEW_TOC_BYTES = 25 * 1024; // 25 KB
 
 export type ViewTocResponse = {
   file: {
@@ -11,51 +12,84 @@ export type ViewTocResponse = {
     mtime: string;
     frontmatter?: Record<string, unknown>;
   };
-  toc: ResponseTocNode[];
+  toc: CompactTocNode[];
   anomalies_summary: {
     total: number;
     by_type: Record<string, number>;
     hint?: string;
   };
+  truncated?: true;
+  effective_depth?: number;
+  hint?: string;
 };
 
-function trimToDepth(
-  node: TocNode,
-  currentDepth: number,
-  maxDepth: number | null
-): ResponseTocNode {
-  const children =
-    maxDepth !== null && currentDepth >= maxDepth
-      ? []
-      : node.children.map((c) => trimToDepth(c, currentDepth + 1, maxDepth));
-  return { ...node, children };
+/**
+ * Finds a TocNode by id recursively. Returns undefined if not found.
+ */
+function findNodeById(nodes: TocNode[], id: string): TocNode | undefined {
+  for (const node of nodes) {
+    if (node.id === id) return node;
+    const found = findNodeById(node.children, id);
+    if (found) return found;
+  }
+  return undefined;
 }
 
-function rawFlatToc(flat: FlatHeader[]): ResponseTocNode[] {
-  return flat.map((h) => ({
-    id: h.id,
-    level: h.level,
-    title: h.title,
-    numbering: h.numbering,
-    line: h.line,
-    line_end: h.line, // in raw mode line_end is unknown — set equal to line
-    section_lines: 1,
-    is_likely_artifact: false,
-    children: [],
-  }));
+/**
+ * Trims a TocNode tree to a given depth and compacts it.
+ * depth=1 means: include the root node but no children.
+ * depth=2 means: include root and its children but no grandchildren.
+ */
+function trimAndCompact(nodes: TocNode[], depth: number): CompactTocNode[] {
+  return nodes.map((node) => trimNodeAndCompact(node, depth));
 }
 
-export function buildViewTocResponse(
+function trimNodeAndCompact(node: TocNode, depth: number): CompactTocNode {
+  const base = compactTocNode(node);
+  if (depth <= 1) {
+    // Drop children at this level
+    const { children: _dropped, ...rest } = base;
+    void _dropped;
+    return rest;
+  }
+  // Recurse into children at depth - 1
+  if (node.children.length > 0) {
+    return {
+      ...base,
+      children: node.children.map((c) => trimNodeAndCompact(c, depth - 1)),
+    };
+  }
+  return base;
+}
+
+/**
+ * Builds a flat list from flat_headers for raw=true mode.
+ * Each header is represented as a minimal compact node with no children.
+ */
+function rawFlatCompact(flat: Index["flat_headers"]): CompactTocNode[] {
+  return flat.map((h) => {
+    const node: CompactTocNode = {
+      id: h.id,
+      level: h.level,
+      title: h.title,
+      line: h.line,
+      line_end: h.line, // in raw mode line_end is unknown — set equal to line
+      section_lines: 1,
+    };
+    if (h.numbering !== null) {
+      node.numbering = h.numbering;
+    }
+    return node;
+  });
+}
+
+/**
+ * Builds the anomalies_summary object from index anomalies.
+ */
+function buildAnomaliesSummary(
   index: Index,
-  input: ViewTocInput
-): ViewTocResponse {
-  const raw = input.raw === true;
-  const depth = input.depth ?? null;
-
-  const tocOut: ResponseTocNode[] = raw
-    ? rawFlatToc(index.flat_headers)
-    : index.toc.map((n) => trimToDepth(n, 1, depth));
-
+  raw: boolean
+): ViewTocResponse["anomalies_summary"] {
   const byType: Record<string, number> = {};
   if (!raw) {
     for (const a of index.anomalies) {
@@ -63,22 +97,134 @@ export function buildViewTocResponse(
     }
   }
   const total = raw ? 0 : index.anomalies.length;
-
   return {
-    file: {
-      path: index.file_path,
-      size_bytes: index.size_bytes,
-      line_count: index.line_count,
-      mtime: new Date(index.mtime_ms).toISOString(),
-      ...(index.frontmatter && { frontmatter: index.frontmatter }),
-    },
-    toc: tocOut,
-    anomalies_summary: {
-      total,
-      by_type: byType,
-      ...(total > 0 && {
-        hint: "Call analyze_document for details and to discuss handling with the user.",
-      }),
-    },
+    total,
+    by_type: byType,
+    ...(total > 0 && {
+      hint: "Call analyze_document for details and to discuss handling with the user.",
+    }),
+  };
+}
+
+/**
+ * Builds the file metadata portion of the response.
+ */
+function buildFileMeta(index: Index): ViewTocResponse["file"] {
+  return {
+    path: index.file_path,
+    size_bytes: index.size_bytes,
+    line_count: index.line_count,
+    mtime: new Date(index.mtime_ms).toISOString(),
+    ...(index.frontmatter && { frontmatter: index.frontmatter }),
+  };
+}
+
+export function buildViewTocResponse(
+  index: Index,
+  input: ViewTocInput
+): ViewTocResponse {
+  const raw = input.raw === true;
+  const file = buildFileMeta(index);
+  const anomalies_summary = buildAnomaliesSummary(index, raw);
+
+  // ─── raw=true mode ─────────────────────────────────────────────────────────
+  if (raw) {
+    const allFlat = rawFlatCompact(index.flat_headers);
+    // Try to fit within cap
+    const response: ViewTocResponse = { file, toc: allFlat, anomalies_summary };
+    const bytes = Buffer.byteLength(JSON.stringify(response), "utf8");
+    if (bytes <= MAX_VIEW_TOC_BYTES) {
+      return response;
+    }
+    // Take a prefix
+    let prefix = allFlat;
+    for (let n = allFlat.length - 1; n >= 1; n--) {
+      prefix = allFlat.slice(0, n);
+      const candidate: ViewTocResponse = {
+        file,
+        toc: prefix,
+        anomalies_summary,
+        truncated: true,
+        effective_depth: 1,
+        hint: `Document has too many headers (${allFlat.length}). Returned first ${n}. Use start_id to navigate further.`,
+      };
+      if (Buffer.byteLength(JSON.stringify(candidate), "utf8") <= MAX_VIEW_TOC_BYTES) {
+        return candidate;
+      }
+    }
+    // Absolute fallback — empty toc (should never happen in practice)
+    return {
+      file,
+      toc: [],
+      anomalies_summary,
+      truncated: true,
+      effective_depth: 1,
+      hint: `Document has too many headers to list even a prefix (${allFlat.length} total).`,
+    };
+  }
+
+  // ─── Resolve effective subtree root ────────────────────────────────────────
+  let subtree: TocNode[];
+  if (input.start_id !== undefined) {
+    const node = findNodeById(index.toc, input.start_id);
+    if (!node) {
+      const err = new Error(
+        `Unknown section id "${input.start_id}". Use view_toc without start_id to list root sections.`
+      );
+      (err as Error & { code: string }).code = "UNKNOWN_SECTION_ID";
+      throw err;
+    }
+    subtree = node.children;
+  } else {
+    subtree = index.toc;
+  }
+
+  // ─── Iterative depth reduction ──────────────────────────────────────────────
+  const requested = input.depth ?? 6;
+
+  for (let d = requested; d >= 1; d--) {
+    const trimmed = trimAndCompact(subtree, d);
+    const candidate: ViewTocResponse = { file, toc: trimmed, anomalies_summary };
+    const bytes = Buffer.byteLength(JSON.stringify(candidate), "utf8");
+    if (bytes <= MAX_VIEW_TOC_BYTES) {
+      if (d < requested) {
+        return {
+          ...candidate,
+          truncated: true,
+          effective_depth: d,
+          hint: `Tree trimmed from depth ${requested} to ${d}; use start_id=<a leaf id> to drill deeper.`,
+        };
+      }
+      return candidate;
+    }
+  }
+
+  // ─── Even depth=1 too large — take prefix of root nodes ────────────────────
+  const rootsAtDepth1 = trimAndCompact(subtree, 1);
+  const total = rootsAtDepth1.length;
+
+  for (let n = total - 1; n >= 1; n--) {
+    const prefix = rootsAtDepth1.slice(0, n);
+    const candidate: ViewTocResponse = {
+      file,
+      toc: prefix,
+      anomalies_summary,
+      truncated: true,
+      effective_depth: 1,
+      hint: `Document has too many root sections (${total}). Returned first ${n}. Use start_id to navigate further.`,
+    };
+    if (Buffer.byteLength(JSON.stringify(candidate), "utf8") <= MAX_VIEW_TOC_BYTES) {
+      return candidate;
+    }
+  }
+
+  // Absolute fallback — empty toc
+  return {
+    file,
+    toc: [],
+    anomalies_summary,
+    truncated: true,
+    effective_depth: 1,
+    hint: `Document has too many root sections (${total}). None fit within the cap.`,
   };
 }

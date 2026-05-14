@@ -7,7 +7,6 @@ import { parsePdfPageMarkers } from "../parser/pdf_pages.js";
 import { buildTocTree } from "./reparenting.js";
 import { detectAnomalies } from "../anomalies/detector.js";
 import type { FlatHeader, Index, TocNode } from "./types.js";
-import type { PdfMarker } from "../parser/pdf_pages.js";
 
 function stripBOM(s: string): string {
   return s.length > 0 && s.charCodeAt(0) === 0xfeff ? s.slice(1) : s;
@@ -21,24 +20,6 @@ function computeLineOffsets(content: string): number[] {
     }
   }
   return offsets;
-}
-
-function assignPdfPages(nodes: TocNode[], markers: PdfMarker[]): void {
-  for (const node of nodes) {
-    const pages = [
-      ...new Set(
-        markers
-          .filter((m) => m.line >= node.line && m.line <= node.line_end)
-          .map((m) => m.page)
-      ),
-    ].sort((a, b) => a - b);
-    if (pages.length > 0) {
-      node.pdf_pages = pages;
-    }
-    if (node.children.length > 0) {
-      assignPdfPages(node.children, markers);
-    }
-  }
 }
 
 function findNodeById(nodes: TocNode[], id: string): TocNode | undefined {
@@ -73,13 +54,10 @@ export async function buildIndex(filePath: string): Promise<Index> {
   const line_count = line_offsets.length;
   const toc = buildTocTree(flat, line_count);
 
-  // Step 1: parse PDF page markers
+  // Step 1: parse PDF page markers (needed for adjacent_pdf_markers in anomaly detection)
   const pdf_markers = parsePdfPageMarkers(raw);
 
-  // Step 2: assign pdf_pages to each TocNode based on markers in range
-  assignPdfPages(toc, pdf_markers);
-
-  // Step 3: build a temp index to run anomaly detection
+  // Step 2: build a temp index to run anomaly detection
   const tempIndex: Index = {
     file_path: filePath,
     size_bytes: stats.size,
@@ -97,16 +75,26 @@ export async function buildIndex(filePath: string): Promise<Index> {
 
   const anomalies = detectAnomalies(tempIndex);
 
-  // Step 4: flag self-nesting nodes
+  // Step 4: flag self-nesting and consecutive_pair_header nodes as likely artifacts
   for (const anomaly of anomalies) {
-    if (anomaly.type === "self_nesting_header") {
+    if (
+      anomaly.type === "self_nesting_header" ||
+      anomaly.type === "consecutive_pair_header"
+    ) {
       const node = findNodeById(toc, anomaly.node_id);
       if (node) {
         node.is_likely_artifact = true;
-        const ancestor = anomaly.context.duplicates_open_ancestor;
-        node.artifact_reason = ancestor
-          ? `self_nesting: title duplicates open ancestor at L${ancestor.line}`
-          : "self_nesting: title duplicates open ancestor";
+        if (anomaly.type === "self_nesting_header") {
+          const ancestor = anomaly.context.duplicates_open_ancestor;
+          node.artifact_reason = ancestor
+            ? `self_nesting: title duplicates open ancestor at L${ancestor.line}`
+            : "self_nesting: title duplicates open ancestor";
+        } else {
+          const paired = anomaly.context.paired_with;
+          node.artifact_reason = paired
+            ? `consecutive_pair_header: paired with "${paired.title}" at L${paired.line}`
+            : "consecutive_pair_header";
+        }
       }
     }
   }

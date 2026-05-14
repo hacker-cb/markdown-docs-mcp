@@ -24,7 +24,7 @@ interface TocNodeMini {
   id: string;
   title: string;
   level: number;
-  children: TocNodeMini[];
+  children?: TocNodeMini[]; // omitted when empty (compact form)
 }
 
 interface AbsorbedArtifact {
@@ -94,7 +94,7 @@ async function findSectionId(
   function search(nodes: TocNodeMini[]): string | undefined {
     for (const n of nodes) {
       if (n.title.toLowerCase().includes(lower)) return n.id;
-      const found = search(n.children);
+      const found = search(n.children ?? []);
       if (found) return found;
     }
     return undefined;
