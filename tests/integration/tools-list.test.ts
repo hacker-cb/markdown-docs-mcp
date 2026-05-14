@@ -59,29 +59,18 @@ describe("tools/list", () => {
     }
   });
 
-  it("view_toc and read_section carry anthropic/maxResultSizeChars annotation", async () => {
+  it("all four tools carry the anthropic/maxResultSizeChars annotation", async () => {
     // Claude Code v2.1.91+ reads this _meta field to lift its truncation cap.
-    // 200_000 chars comfortably covers our 50/200 KB byte caps plus UTF-8 expansion.
+    // We set 200_000 on every tool for symmetry — analyze_document already hits
+    // ~27 KB on real PDF-converted documents, and search responses, while
+    // usually small, have no hard cap. Setting uniformly avoids surprise
+    // truncation on the smaller-but-still-substantial responses.
     const { tools } = await client.listTools();
-    const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
-
-    const viewToc = byName["view_toc"];
-    const readSection = byName["read_section"];
-
-    expect(viewToc?._meta?.["anthropic/maxResultSizeChars"]).toBe(200_000);
-    expect(readSection?._meta?.["anthropic/maxResultSizeChars"]).toBe(200_000);
-  });
-
-  it("search and analyze_document do not carry the maxResultSizeChars annotation", async () => {
-    // Their responses are inherently small (results capped at ~50 hits / per-anomaly
-    // structured records), so we don't request a lifted cap. Verifying absence
-    // documents the deliberate choice — flipping it later is a behaviour change.
-    const { tools } = await client.listTools();
-    const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
-
-    expect(byName["search"]?._meta?.["anthropic/maxResultSizeChars"]).toBeUndefined();
-    expect(
-      byName["analyze_document"]?._meta?.["anthropic/maxResultSizeChars"]
-    ).toBeUndefined();
+    for (const tool of tools) {
+      expect(
+        tool._meta?.["anthropic/maxResultSizeChars"],
+        `${tool.name} missing maxResultSizeChars annotation`
+      ).toBe(200_000);
+    }
   });
 });
