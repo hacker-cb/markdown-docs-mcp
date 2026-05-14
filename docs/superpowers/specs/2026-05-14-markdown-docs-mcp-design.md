@@ -337,7 +337,9 @@ type Anomaly = {
 
 ### 5.2 Эвристика self_nesting
 
-Заголовок `H` помечается `is_likely_artifact: true` тогда и только тогда, когда в цепочке его открытых предков на момент появления в файле уже есть заголовок с тем же `title` (буквальное сравнение после нормализации whitespace).
+Заголовок `H` помечается `is_likely_artifact: true` тогда и только тогда, когда:
+
+1. В цепочке открытых предков `H` на момент его появления в файле уже есть заголовок с тем же `title` (буквальное сравнение после нормализации whitespace).
 
 Это структурное условие, а не сходство. Глобальные повторы заголовков в разных ветках документа (типа `Examples` в Annex A и Annex B) не помечаются.
 
@@ -471,14 +473,14 @@ Description пишется на английском (in-repo English convention
 - read_section на любом разделе — < 50 ms warm.
 - 100 последовательных search-запросов с разными query — < 1 секунды cumulative.
 
-Не critical-path тесты; на медленных CI-runner'ах их можно помечать `skip` без блокировки PR.
+Не critical-path тесты; в CI могут быть skipping на медленных runner'ах.
 
 ## 10. Build / CI / Release
 
 ### 10.1 Build
 
 - Single-file bundle через esbuild: `src/index.ts` -> `dist/index.js`. Bundle включает markdown-it и другие deps.
-- target: `node18` (LTS). 
+- target: `node18` (LTS).
 - `dist/` gitignored. Собирается в CI перед npm publish и перед запуском integration-тестов.
 
 ### 10.2 GitHub Actions
@@ -524,7 +526,7 @@ markdown-docs-mcp/
       comments.ts                # HTML-комментарии: распознавание, фильтрация
       frontmatter.ts             # YAML frontmatter parsing
       numbering.ts               # извлечение numbering из title
-    indexing/
+    index/
       builder.ts                 # построение Index из файла
       cache.ts                   # LRU + mtime invalidation
       reparenting.ts             # построение дерева с reparenting
@@ -589,3 +591,25 @@ markdown-docs-mcp/
 ## 14. Открытые вопросы
 
 Все ключевые решения зафиксированы в этом spec'е. Открытых архитектурных вопросов на момент написания нет. Технические детали реализации (точный формат marketplace.json, конкретные esbuild опции, выбор библиотеки для frontmatter parsing) решаются в плане реализации.
+
+## 15. Roadmap реализации
+
+Декомпозиция работы на серию PR. Статус каждого PR трекается чекбоксом — отмечается в финальном коммите каждого PR перед merge'ом. Per-PR планы живут отдельно в `docs/superpowers/plans/<date>-pr-NN-<slug>.md` (по `working-on-large-tasks` skill).
+
+- [ ] **PR-01: Bootstrap** — `package.json`, `tsconfig.json`, esbuild config, vitest config, GitHub Actions test workflow, LICENSE, README skeleton, public fixtures (`esp32-p4-datasheet.md`, `stm32h750ib.md`). Без логики MCP.
+
+- [ ] **PR-02: MCP server skeleton** — stdio entry (`src/index.ts`), Zod schemas (`src/schemas/`), регистрация четырёх tools через стандартный `tools/list`. Tools возвращают `not_implemented` error до своей очереди. Базовый JSON-RPC integration test (handshake + список tools).
+
+- [ ] **PR-03: Parser + indexing core** — `src/parser/*` (markdown-it wrapper, comments, frontmatter, numbering), `src/index/*` (builder, LRU cache, reparenting). Unit-тесты на inline-фикстурах. Tools всё ещё возвращают `not_implemented`.
+
+- [ ] **PR-04: view_toc + anomalies** — реализация `view_toc` tool (включая `pdf_pages` в metadata), anomalies detector (`self_nesting_header`, `level_jump`, `orphan_subheader`, `empty_section`). Integration test на public fixtures + line-coverage invariant («no content loss»).
+
+- [ ] **PR-05: read_section** — `raw` + `logical` modes, `include_subsections`, `include_comments`, truncation с hard cap 200 KB + continuation через `from_line`. Byte-reconstruction invariant на public fixtures.
+
+- [ ] **PR-06: search + analyze_document** — оба оставшихся tool'а. `search` с `scope`, `regex`, `case_sensitive`, `context_lines`. `analyze_document` с `logical_effect` и `adjacent_pdf_markers`. Integration tests.
+
+- [ ] **PR-07: Plugin packaging** — `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `.mcp.json`, `skills/reading-large-markdown/SKILL.md` + `references/pdf-converted-docs.md`. Manual smoke test через `claude --plugin-dir`.
+
+- [ ] **PR-08: Release pipeline** — GitHub Actions release workflow (test → build → npm publish → GitHub Release), release script для атомарной синхронизации версий в `package.json` / `plugin.json` / `.mcp.json`, dry-run `npm publish`, финальный README с ссылкой на pdf2md-claude.
+
+После merge всех PR — `cleanup-superpowers-plans` (Mode C) для уборки per-PR планов и этого spec'а, если он перестаёт быть нужен.
