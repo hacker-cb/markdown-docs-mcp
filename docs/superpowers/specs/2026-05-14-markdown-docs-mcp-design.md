@@ -482,20 +482,31 @@ Skill `reading-large-markdown` исходно предполагался, но �
 
 ### 10.2 GitHub Actions
 
-- **PR / push на feature-branch:** `pnpm install && pnpm test` (unit + integration на public fixtures).
-- **Push на dev:** то же + `pnpm build` (smoke-check bundle).
-- **Tag `v*` на master:** test + build + `npm publish` + создание GitHub Release.
+- **`.github/workflows/test.yml`** — PR / push на `dev` / `master` / feature-ветку: `pnpm install --frozen-lockfile && pnpm typecheck && pnpm test && pnpm build` на матрице Node 20 / 22.
+- **`.github/workflows/release.yml`** — trigger на `push` тега `v*`: тот же test + build, затем `npm publish --provenance --access public` через **npm Trusted Publisher (OIDC)** + создание GitHub Release через `softprops/action-gh-release@v2 (generate_release_notes: true)`. `permissions: id-token: write` нужен для OIDC; `NPM_TOKEN` секрет **не используется**.
 
 ### 10.3 Release flow
 
-Single source of truth — `package.json` version. Release script (`scripts/release.ts` или просто `npm version`-hooks):
+Single source of truth — `package.json` version. Скрипт `scripts/release.mjs` атомарно проставляет одну и ту же версию в 4 места:
 
-1. `npm version <major|minor|patch>` обновляет `package.json`.
-2. Скрипт обновляет `.claude-plugin/plugin.json:version` и аргумент `.mcp.json:mcpServers.markdown-docs.args[1]` (`markdown-docs-mcp@<новая_версия>`).
-3. Создаёт commit и tag v<version>.
-4. `git push --follow-tags` — CI публикует.
+| Файл | Где обновляется |
+|---|---|
+| `package.json` | `.version` |
+| `.claude-plugin/plugin.json` | `.version` |
+| `.claude-plugin/marketplace.json` | `.plugins[0].version` |
+| `.mcp.json` | `.mcpServers["markdown-docs"].args[1]` (`markdown-docs-mcp@<version>`) |
 
-Это обеспечивает атомарную синхронизацию плагина и npm-пакета.
+Workflow:
+
+1. Чекаут `master`, `git pull --ff-only`.
+2. `pnpm release X.Y.Z` (или `--dry-run X.Y.Z` для предпросмотра diff'ов). Скрипт: валидирует semver → пишет 4 файла → `git add` → `git commit -m "release: vX.Y.Z"` → `git tag vX.Y.Z`. Не пушит.
+3. Локальная проверка: `pnpm test && pnpm build`.
+4. `git push --follow-tags origin master` — пушит commit и tag.
+5. GitHub Actions release.yml: тестирует, билдит, `npm publish --provenance` (OIDC), создаёт GitHub Release.
+
+Чтобы первый publish прошёл — нужно разово настроить **npm Trusted Publisher** на npmjs.com (Account → Trusted Publishers → добавить `hacker-cb/markdown-docs-mcp` + workflow path `.github/workflows/release.yml`). После этого никаких секретов в GitHub не требуется — OIDC-токен выдаётся в момент publish'а.
+
+Скрипт защищён от запуска не из `master` (override через `--force` для rehearsal). Тесты `tests/unit/release_script.test.ts` проверяют пуристый transform `applyVersionToFiles` независимо от git/файловой системы.
 
 ### 10.4 Версионирование
 
@@ -625,6 +636,6 @@ markdown-docs-mcp/
 
 - [x] **PR-07: Plugin packaging** — `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `.mcp.json` (запускает npm-пакет через `npx -y markdown-docs-mcp@<version>`), cross-file invariants test. Skill решено не отгружать (см. section 8). Manual smoke test через `/plugin marketplace add hacker-cb/markdown-docs-mcp`.
 
-- [ ] **PR-08: Release pipeline** — GitHub Actions release workflow (test → build → npm publish → GitHub Release), release script для атомарной синхронизации версий в `package.json` / `plugin.json` / `.mcp.json`, dry-run `npm publish`, финальный README с ссылкой на pdf2md-claude.
+- [x] **PR-08: Release pipeline** — `scripts/release.mjs` (атомарная синхронизация версий в 4 файлах), `.github/workflows/release.yml` (test + build + `npm publish --provenance` через Trusted Publisher OIDC + GitHub Release), pure-transform unit-тесты на release-script, README с актуальной installation секцией. Trusted Publisher настройка на npmjs.com выполняется автором разово вне репо.
 
 После merge всех PR — `cleanup-superpowers-plans` (Mode C) для уборки per-PR планов и этого spec'а, если он перестаёт быть нужен.

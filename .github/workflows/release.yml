@@ -1,0 +1,61 @@
+name: release
+
+# Fires when a release tag is pushed to master. Use scripts/release.mjs locally
+# to produce the four-file version bump + tag; this workflow takes it from
+# there: re-run the full test matrix, build, then publish to npm via Trusted
+# Publisher (OIDC, no NPM_TOKEN secret) and create a GitHub Release.
+
+on:
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: publish to npm + GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write   # softprops/action-gh-release writes the release
+      id-token: write   # npm OIDC for Trusted Publisher
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Publish to npm (OIDC / Trusted Publisher)
+        # --provenance signs the publish with the GitHub workflow's identity,
+        # which npmjs.com shows as a verified provenance badge.
+        # Trusted Publisher must be configured on npmjs.com (Account → Trusted
+        # Publishers → add this repo + workflow file) before the first publish.
+        run: npm publish --provenance --access public
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true

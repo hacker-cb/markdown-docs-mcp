@@ -56,6 +56,18 @@ pnpm test
 pnpm build
 ```
 
+## Releasing
+
+Versions live in four places that must stay in lockstep: `package.json`, `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` (`plugins[0].version`), and `.mcp.json` (`args[1]`). `scripts/release.mjs` bumps them atomically and creates a `release: vX.Y.Z` commit plus a `vX.Y.Z` tag. From `master`:
+
+```bash
+pnpm release --dry-run 0.2.0    # preview diff
+pnpm release 0.2.0              # apply + commit + tag
+git push --follow-tags origin master
+```
+
+The `release.yml` workflow runs on `v*` tags: full test matrix → build → `npm publish --provenance --access public` via npm Trusted Publisher (OIDC, no `NPM_TOKEN` needed) → GitHub Release with auto-generated notes. Trusted Publisher must be configured once on npmjs.com under the maintainer account.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
