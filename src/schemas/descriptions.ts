@@ -36,7 +36,7 @@ Errors: invalid section_id returns a list of close-by ids to help recovery.`;
 
 export const SEARCH_DESCRIPTION = `Searches a markdown document for literal substrings or regex.
 
-Default scope="all": matches in headings and body. Pass scope="titles" or "content" to narrow.
+Default scope="all": matches in headings and body. Pass scope="titles" or "content" to narrow. When scope="titles" returns 0 hits, prefer one broader scope="all" or scope="content" call over multiple titles-scoped tries with reordered words — substring matching does not handle word permutations.
 
 Default regex=false (case-insensitive literal); pass regex=true to treat query as a JavaScript regex (case-sensitive by default; override with case_sensitive).
 

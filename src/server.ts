@@ -73,6 +73,7 @@ export function createServer(deps: ServerDeps = {}): McpServer {
     {
       description: SEARCH_DESCRIPTION,
       inputSchema: searchInput,
+      _meta: { "anthropic/maxResultSizeChars": MAX_RESULT_SIZE_CHARS },
     },
     async (args) => searchHandler(args)
   );
@@ -82,6 +83,7 @@ export function createServer(deps: ServerDeps = {}): McpServer {
     {
       description: ANALYZE_DOCUMENT_DESCRIPTION,
       inputSchema: analyzeDocumentInput,
+      _meta: { "anthropic/maxResultSizeChars": MAX_RESULT_SIZE_CHARS },
     },
     async (args) => analyzeDocumentHandler(args)
   );
