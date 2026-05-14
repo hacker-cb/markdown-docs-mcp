@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-- `pnpm test` — full Vitest run (unit + integration; the TRM stress suite cold-starts indexing ~90–120 s locally, ~3–5 min on GitHub runners). All integration fixtures are real public datasheets under `tests/fixtures/public/`.
+- `pnpm test` — full Vitest run (unit + integration; the TRM stress suite cold-starts indexing in well under 1 s locally post perf-optimization). All integration fixtures are real public datasheets under `tests/fixtures/public/`.
 - `pnpm test -- tests/unit/tools/compact.test.ts` — single test file (Vitest accepts a path arg after `--`).
 - `pnpm test:watch` — Vitest in watch mode.
 - `pnpm typecheck` — `tsc --noEmit`. Fast feedback while developing.
@@ -80,6 +80,6 @@ Detector reports five types: `self_nesting_header`, `level_jump`, `orphan_subhea
 
 ## Testing notes
 
-- The TRM stress test (`tests/integration/stress_huge_document.test.ts`) pre-warms a shared `IndexCache` in `beforeAll(..., 600_000)` so all four sub-tests reuse one cold start. **Don't lower that timeout** — GitHub runners need it.
+- The TRM stress test (`tests/integration/stress_huge_document.test.ts`) pre-warms a shared `IndexCache` in `beforeAll(..., 60_000)` so all four sub-tests reuse one cold start. The 60 s timeout is generous headroom (~30× over local cold-start of <1 s) for slow CI runners and GC jitter.
 - The stress test injects a deliberately small cap (`maxViewTocBytes: 5 * 1024`) via `createServer({ cache, config })` because the production 50 KB default fits the full depth-6 tree on this fixture and would lose coverage of the cap-reduction code path.
 - Tests under `tests/unit/anomalies/detector.test.ts` use a `mkFlat()` helper that synthesizes minimal `FlatHeader` fixtures. When adding new detector tests, follow the same pattern instead of inlining literals — `FlatHeader` carries `line_end` / `section_lines` that detector tests don't care about, and the helper hides that boilerplate.

@@ -1,10 +1,20 @@
-import type { FlatSeed, TocNode } from "./types.js";
+import type { FlatHeader, FlatSeed, TocNode } from "./types.js";
 
-export function buildTocTree(headers: FlatSeed[], totalLines: number): TocNode[] {
+export type ReparentingResult = {
+  roots: TocNode[];
+  flat: FlatHeader[]; // same order as input headers; line_end / section_lines filled
+};
+
+export function buildTocTree(
+  headers: FlatSeed[],
+  totalLines: number
+): ReparentingResult {
   const roots: TocNode[] = [];
   const stack: TocNode[] = [];
+  const nodes: TocNode[] = new Array(headers.length);
 
-  for (const h of headers) {
+  for (let i = 0; i < headers.length; i++) {
+    const h = headers[i]!;
     const node: TocNode = {
       id: h.id,
       level: h.level,
@@ -16,7 +26,12 @@ export function buildTocTree(headers: FlatSeed[], totalLines: number): TocNode[]
       is_likely_artifact: false,
       children: [],
     };
-    while (stack.length > 0 && stack[stack.length - 1]!.level >= node.level) {
+    nodes[i] = node;
+
+    while (
+      stack.length > 0 &&
+      stack[stack.length - 1]!.level >= node.level
+    ) {
       stack.pop();
     }
     if (stack.length === 0) {
@@ -27,8 +42,8 @@ export function buildTocTree(headers: FlatSeed[], totalLines: number): TocNode[]
     stack.push(node);
   }
 
-  // Second pass: compute line_end. For each header at index i, the section ends
-  // right before the next header with level <= h.level, or at totalLines.
+  // Second pass: compute line_end via index lookup, no recursion.
+  const flat: FlatHeader[] = new Array(headers.length);
   for (let i = 0; i < headers.length; i++) {
     const h = headers[i]!;
     let endLine = totalLines;
@@ -39,21 +54,14 @@ export function buildTocTree(headers: FlatSeed[], totalLines: number): TocNode[]
         break;
       }
     }
-    const node = findNodeById(roots, h.id);
-    if (node) {
-      node.line_end = endLine;
-      node.section_lines = endLine - h.line + 1;
-    }
+    nodes[i]!.line_end = endLine;
+    nodes[i]!.section_lines = endLine - h.line + 1;
+    flat[i] = {
+      ...h,
+      line_end: endLine,
+      section_lines: endLine - h.line + 1,
+    };
   }
 
-  return roots;
-}
-
-function findNodeById(nodes: TocNode[], id: string): TocNode | undefined {
-  for (const n of nodes) {
-    if (n.id === id) return n;
-    const found = findNodeById(n.children, id);
-    if (found) return found;
-  }
-  return undefined;
+  return { roots, flat };
 }

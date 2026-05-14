@@ -1,4 +1,4 @@
-import type { Index, TocNode } from "../index/types.js";
+import type { Index } from "../index/types.js";
 import type { Anomaly } from "../anomalies/types.js";
 import type { AnalyzeDocumentInput } from "../schemas/inputs.js";
 
@@ -30,19 +30,6 @@ export type AnalyzeDocumentResponse = {
 };
 
 // ---------------------------------------------------------------------------
-// TocNode lookup
-// ---------------------------------------------------------------------------
-
-function findNodeById(nodes: TocNode[], id: string): TocNode | undefined {
-  for (const node of nodes) {
-    if (node.id === id) return node;
-    const found = findNodeById(node.children, id);
-    if (found) return found;
-  }
-  return undefined;
-}
-
-// ---------------------------------------------------------------------------
 // Logical-effect enrichment for self_nesting anomalies
 // ---------------------------------------------------------------------------
 
@@ -64,11 +51,11 @@ function computeLogicalEffect(
   if (!preceding) return undefined;
 
   // Find the TocNode for the preceding real header by line
-  const precedingNode = findNodeById(index.toc, `s${preceding.line}`);
+  const precedingNode = index.node_by_id.get(`s${preceding.line}`);
   if (!precedingNode) return undefined;
 
   // The artifact node
-  const artifactNode = findNodeById(index.toc, anomaly.node_id);
+  const artifactNode = index.node_by_id.get(anomaly.node_id);
 
   // Determine section_extended label. Strip the leading numbering token
   // from title before re-prepending `numbering` to avoid duplication.
@@ -95,7 +82,7 @@ function computeLogicalEffect(
     if (fh.line <= artifactLine) continue;
 
     // Check if this header is an artifact
-    const node = findNodeById(index.toc, fh.id);
+    const node = index.node_by_id.get(fh.id);
     const isArtifact = node?.is_likely_artifact ?? false;
     if (isArtifact) continue;
 
