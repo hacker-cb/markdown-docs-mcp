@@ -35,8 +35,10 @@ beforeAll(
     sharedClient = new Client({ name: "stress-test", version: "0" });
     await Promise.all([server.connect(st), sharedClient.connect(ct)]);
   },
-  // Allow up to 3 minutes for cold-start indexing of the 5.2 MB TRM
-  180_000
+  // Allow up to 10 minutes for cold-start indexing of the 5.2 MB TRM.
+  // Local dev usually finishes in ~90 s; GitHub Actions runners are
+  // ~3-4× slower on I/O+CPU-heavy parsing, so 180 s was not enough.
+  600_000
 );
 
 afterAll(async () => {
