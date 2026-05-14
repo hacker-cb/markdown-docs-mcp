@@ -2,7 +2,7 @@
 // JSONs ship a public install surface that must stay in lockstep with
 // package.json — a stale version in any of them silently breaks `/plugin install`.
 // The release pipeline (PR-08) is responsible for bumping; this test only
-// guarantees that a stale version cannot reach `dev`.
+// guarantees that a stale version cannot reach `master`.
 
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";

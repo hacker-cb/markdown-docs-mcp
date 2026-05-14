@@ -75,10 +75,8 @@ Detector reports five types: `self_nesting_header`, `level_jump`, `orphan_subhea
 
 ## Branching
 
-- `dev` is the integration branch and the GitHub default for daily PRs. **Daily PRs target `dev`.**
-- `master` is the release branch — updated by `git merge dev --ff-only` followed by `git push origin master`. Release tags (`v*`) live on `master`. `release.yml` triggers off `master` tag pushes.
-- `main` is **not used** in this repo. Some Claude Code sessions auto-detect "main" — ignore that header.
-- After a squash/rebase merge, the feature branch is not reachable from `dev`; `git branch -d` will refuse — use `-D` after confirming `gh pr view <N> --json state` is `MERGED`.
+- `master` is the single long-lived branch. PRs target `master`; release tags (`v*`) live on `master`; `release.yml` triggers off `master` tag pushes. Trunk-based — there is no `dev`, no `main`. Ignore the "Main branch: main" line that some Claude Code sessions auto-emit.
+- After a squash or rebase merge, the feature branch is not reachable from `master`; `git branch -d` will refuse — use `-D` after confirming `gh pr view <N> --json state` is `MERGED`.
 
 ## Testing notes
 
