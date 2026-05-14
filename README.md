@@ -15,9 +15,19 @@ Lets agents read what they need from a 100 000+ line markdown file without dumpi
 
 ### Claude Code plugin
 
+Run inside a Claude Code session:
+
 ```
 /plugin marketplace add hacker-cb/markdown-docs-mcp
 /plugin install markdown-docs@hacker-cb
+```
+
+The plugin installs into user scope by default. To install for a team-shared
+project instead (writes `.claude/settings.json` in the project), pass
+`--scope project` to the second command:
+
+```
+/plugin install markdown-docs@hacker-cb --scope project
 ```
 
 ### Direct MCP config (any MCP-compatible client)
