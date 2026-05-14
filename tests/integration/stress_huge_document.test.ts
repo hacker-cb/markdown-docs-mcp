@@ -2,10 +2,6 @@
 // Stress tests on the ESP32-P4 Technical Reference Manual (143k lines, ~5.2 MB).
 // Validates view_toc size cap, start_id drill-down, consecutive_pair_header
 // detection, and the line-coverage invariant on a real-world huge document.
-//
-// NOTE: Indexing the TRM takes ~90-120 s on first call. The shared cache/client
-// ensures indexing happens once; subsequent test calls are fast.
-// Individual test timeouts are set high to accommodate the first cold build.
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { resolve, dirname } from "node:path";
@@ -44,10 +40,10 @@ beforeAll(
     sharedClient = new Client({ name: "stress-test", version: "0" });
     await Promise.all([server.connect(st), sharedClient.connect(ct)]);
   },
-  // Allow up to 10 minutes for cold-start indexing of the 5.2 MB TRM.
-  // Local dev usually finishes in ~90 s; GitHub Actions runners are
-  // ~3-4× slower on I/O+CPU-heavy parsing, so 180 s was not enough.
-  600_000
+  // Cold-start indexing of the 5.2 MB TRM should take well under 1 s
+  // post-perf-optimization. 60 s gives ~30x headroom for slow CI runners,
+  // GC pauses, and I/O jitter.
+  60_000
 );
 
 afterAll(async () => {
