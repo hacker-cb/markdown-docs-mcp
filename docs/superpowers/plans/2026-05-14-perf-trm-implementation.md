@@ -1368,22 +1368,26 @@ git commit -m "perf(analyze_document): use node_by_id from Index"
 
 - [ ] **Step 13.1: Вручную замерить новый cold-start**
 
-Создать временный замерщик `/tmp/measure-coldstart.mjs`:
+Создать временный замерщик в `/tmp/measure-coldstart.mjs` (пути собираем из переменной `REPO`, передаваемой на запуск):
 
 ```js
 import { performance } from "node:perf_hooks";
-import { buildIndex } from "/Users/pavel/projects/markdown-docs-mcp/src/index/builder.ts";
 
-const TRM = "/Users/pavel/projects/markdown-docs-mcp/tests/fixtures/public/esp32-p4-trm.md";
+const REPO = process.env.REPO;
+if (!REPO) throw new Error("Set REPO to the repo root before running");
+
+const { buildIndex } = await import(`${REPO}/src/index/builder.ts`);
+const TRM = `${REPO}/tests/fixtures/public/esp32-p4-trm.md`;
+
 const t0 = performance.now();
 await buildIndex(TRM);
 console.log("cold-start:", (performance.now() - t0).toFixed(0), "ms");
 ```
 
-Запустить:
+Запустить (изнутри репозитория):
 
 ```bash
-pnpm exec tsx /tmp/measure-coldstart.mjs
+REPO="$PWD" pnpm exec tsx /tmp/measure-coldstart.mjs
 ```
 
 Expected: < 1 000 ms на современном Mac. Запишите фактическое значение в commit message Step 13.6.

@@ -5,7 +5,7 @@
 
 ## Мотивация
 
-На фикстуре `tests/fixtures/public/esp32-p4-trm.md` (5.18 MB, 143 383 строки, 2 011 заголовков, ~16 000 HTML-комментариев, ~5 200 PDF-маркеров) `buildIndex` занимает **112 секунд** на локальной машине (M-серия Mac). CI-таймаут стресс-теста стоит на 10 минут (`stress_huge_document.test.ts:50`), и это — реальная плата за то, что на каждый чтениe MCP-сервер пере-индексирует документ с нуля при сбое кэша.
+На фикстуре `tests/fixtures/public/esp32-p4-trm.md` (5.18 MB, 143 383 строки, 2 011 заголовков, ~16 000 HTML-комментариев, ~5 200 PDF-маркеров) `buildIndex` занимает **112 секунд** на локальной машине (M-серия Mac). CI-таймаут стресс-теста стоит на 10 минут (`stress_huge_document.test.ts:50`), и это — реальная плата за то, что на каждое чтение MCP-сервер пере-индексирует документ с нуля при сбое кэша.
 
 Замер по фазам (`/tmp/bench-trm.mjs`):
 
@@ -68,53 +68,11 @@ type SectionInfo = {
 
 ### Парсеры (комментарии и PDF-маркеры)
 
-Оба парсера переходят на алгоритм «один проход по `content` с бегущим счётчиком newline».
+**Принимаемая стратегия:** построить `line_offsets[]` первым шагом в `builder.ts` (он и так нужен дальше) и оба парсера принимают его как аргумент. Конвертация `match.index → line` идёт через бинпоиск `binarySearch(line_offsets, offset)` — O(log N) на каждый match вместо O(N).
 
-#### `src/parser/comments.ts`
+Альтернатива «один проход по `content` с бегущим счётчиком newline» рассматривалась и отвергнута: бинпоиск проще, переиспользует уже нужный `line_offsets`, и на TRM даёт тот же класс сложности (`O(M log N)` против `O(N + M)`) при меньшем количестве кода.
 
-Текущая структура: цикл `re.exec(content)` + `lineOfOffset(content, offset)` на каждый match.
-
-Новая структура (псевдокод):
-
-```ts
-export function findCommentRanges(content: string): CommentRange[] {
-  const codeRanges = getCodeBlockRanges(content); // оставляем как есть — markdown-it один раз
-  const re = /<!--[\s\S]*?-->/g;
-  const matches: Array<{ startOffset: number; endOffset: number }> = [];
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(content)) !== null) {
-    matches.push({
-      startOffset: m.index,
-      endOffset: m.index + m[0].length - 1,
-    });
-  }
-  // matches уже отсортированы по startOffset — один проход по content
-  const result: CommentRange[] = [];
-  let line = 1;
-  let scanIdx = 0;
-  for (const { startOffset, endOffset } of matches) {
-    while (scanIdx < startOffset) {
-      if (content.charCodeAt(scanIdx) === 10) line++;
-      scanIdx++;
-    }
-    const start_line = line;
-    while (scanIdx <= endOffset) {
-      if (content.charCodeAt(scanIdx) === 10) line++;
-      scanIdx++;
-    }
-    const end_line = line; // включает \n в комментарии до фактического конца
-    // ... isInsideCode проверка ...
-    if (!insideCode) result.push({ start_line, end_line });
-  }
-  return result;
-}
-```
-
-Точнее, для `end_line` нужно посчитать линию **на byte = endOffset**, а не после него — мелкий off-by-one риск, ловится unit-тестом.
-
-Альтернатива (проще): построить `line_offsets[]` раньше и использовать `binarySearch(offsets, offset)` для O(log N) на match. Но `line_offsets` сейчас строится **после** парсеров — потребуется переставить порядок в `builder.ts`. Это нормально и даже желательно: `computeLineOffsets` стоит 6.9 ms — двигаем в начало.
-
-**Принимаемая стратегия:** строим `line_offsets` первым шагом в `builder.ts`, оба парсера принимают его как аргумент и используют бинпоиск.
+Новые сигнатуры:
 
 ```ts
 // comments.ts
