@@ -479,7 +479,7 @@ Description пишется на английском (in-repo English convention
 
 ### 10.1 Build
 
-- Single-file bundle через esbuild: `src/index.ts` -> `dist/index.js`. Bundle включает markdown-it и другие deps.
+- Single-file bundle через esbuild: `src/index.ts` -> `dist/index.js`. Большинство runtime deps вкомпилены в bundle. Исключение: `gray-matter` помечен `external` в esbuild config из-за dynamic `require("fs")`, который не работает в ESM-бандле; npm install / npx подтягивают его автоматически как обычный transitive dep.
 - target: `node20` (LTS) — node18 вышел из active LTS в апреле 2025; обновление зафиксировано в PR-01.
 - `dist/` gitignored. Собирается в CI перед npm publish и перед запуском integration-тестов.
 
@@ -602,7 +602,7 @@ markdown-docs-mcp/
 
 - [x] **PR-03: Parser + indexing core** — `src/parser/*` (markdown-it wrapper, comments, frontmatter, numbering), `src/index/*` (builder, LRU cache, reparenting). Unit-тесты на inline-фикстурах. Tools всё ещё возвращают `not_implemented`.
 
-- [ ] **PR-04: view_toc + anomalies** — реализация `view_toc` tool (включая `pdf_pages` в metadata), anomalies detector (`self_nesting_header`, `level_jump`, `orphan_subheader`, `empty_section`). Integration test на public fixtures + line-coverage invariant («no content loss»).
+- [x] **PR-04: view_toc + anomalies** — реализация `view_toc` tool (включая `pdf_pages` в metadata), anomalies detector (`self_nesting_header`, `level_jump`, `orphan_subheader`, `empty_section`). Integration test на public fixtures + line-coverage invariant («no content loss»).
 
 - [ ] **PR-05: read_section** — `raw` + `logical` modes, `include_subsections`, `include_comments`, truncation с hard cap 200 KB + continuation через `from_line`. Byte-reconstruction invariant на public fixtures.
 
