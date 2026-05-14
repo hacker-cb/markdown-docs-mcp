@@ -23,18 +23,6 @@ export type ViewTocResponse = {
 };
 
 /**
- * Finds a TocNode by id recursively. Returns undefined if not found.
- */
-function findNodeById(nodes: TocNode[], id: string): TocNode | undefined {
-  for (const node of nodes) {
-    if (node.id === id) return node;
-    const found = findNodeById(node.children, id);
-    if (found) return found;
-  }
-  return undefined;
-}
-
-/**
  * Trims a TocNode tree to a given depth and compacts it.
  * depth=1 means: include the root node but no children.
  * depth=2 means: include root and its children but no grandchildren.
@@ -123,21 +111,31 @@ export function buildViewTocResponse(
     if (bytes <= maxBytes) {
       return response;
     }
-    // Take a prefix
-    let prefix = allFlat;
-    for (let n = allFlat.length - 1; n >= 1; n--) {
-      prefix = allFlat.slice(0, n);
-      const candidate: ViewTocResponse = {
-        file,
-        toc: prefix,
-        anomalies_summary,
-        truncated: true,
-        effective_depth: 1,
-        hint: `Document has too many headers (${allFlat.length}). Returned first ${n}. Use start_id to navigate further.`,
-      };
+    // Binary-search the largest prefix length n in [1, allFlat.length-1]
+    // such that the JSON fits within maxBytes.
+    const buildCandidate = (n: number): ViewTocResponse => ({
+      file,
+      toc: allFlat.slice(0, n),
+      anomalies_summary,
+      truncated: true,
+      effective_depth: 1,
+      hint: `Document has too many headers (${allFlat.length}). Returned first ${n}. Use start_id to navigate further.`,
+    });
+    let lo = 1;
+    let hi = allFlat.length - 1;
+    let best: ViewTocResponse | null = null;
+    while (lo <= hi) {
+      const mid = (lo + hi) >>> 1;
+      const candidate = buildCandidate(mid);
       if (Buffer.byteLength(JSON.stringify(candidate), "utf8") <= maxBytes) {
-        return candidate;
+        best = candidate;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
       }
+    }
+    if (best !== null) {
+      return best;
     }
     // Absolute fallback — empty toc (should never happen in practice)
     return {
@@ -153,7 +151,7 @@ export function buildViewTocResponse(
   // ─── Resolve effective subtree root ────────────────────────────────────────
   let subtree: TocNode[];
   if (input.start_id !== undefined) {
-    const node = findNodeById(index.toc, input.start_id);
+    const node = index.node_by_id.get(input.start_id);
     if (!node) {
       const err = new Error(
         `Unknown section id "${input.start_id}". Use view_toc without start_id to list root sections.`
@@ -190,19 +188,29 @@ export function buildViewTocResponse(
   const rootsAtDepth1 = trimAndCompact(subtree, 1);
   const total = rootsAtDepth1.length;
 
-  for (let n = total - 1; n >= 1; n--) {
-    const prefix = rootsAtDepth1.slice(0, n);
-    const candidate: ViewTocResponse = {
-      file,
-      toc: prefix,
-      anomalies_summary,
-      truncated: true,
-      effective_depth: 1,
-      hint: `Document has too many root sections (${total}). Returned first ${n}. Use start_id to navigate further.`,
-    };
+  const buildRootCandidate = (n: number): ViewTocResponse => ({
+    file,
+    toc: rootsAtDepth1.slice(0, n),
+    anomalies_summary,
+    truncated: true,
+    effective_depth: 1,
+    hint: `Document has too many root sections (${total}). Returned first ${n}. Use start_id to navigate further.`,
+  });
+  let lo2 = 1;
+  let hi2 = total - 1;
+  let best2: ViewTocResponse | null = null;
+  while (lo2 <= hi2) {
+    const mid = (lo2 + hi2) >>> 1;
+    const candidate = buildRootCandidate(mid);
     if (Buffer.byteLength(JSON.stringify(candidate), "utf8") <= maxBytes) {
-      return candidate;
+      best2 = candidate;
+      lo2 = mid + 1;
+    } else {
+      hi2 = mid - 1;
     }
+  }
+  if (best2 !== null) {
+    return best2;
   }
 
   // Absolute fallback — empty toc
