@@ -37,7 +37,9 @@ LLM-агенты, работающие с большими markdown-докуме
 
 1. **npm-пакет `markdown-docs-mcp`** (первичный) — исполняемый MCP-сервер (stdio transport). Self-contained: bundle на esbuild, ноль runtime-зависимостей, работает с любым MCP-совместимым клиентом. Это основной отгружаемый артефакт; всё остальное — обёртки.
 
-2. **Claude Code plugin `markdown-docs`** (обёртка для удобства Claude Code users) — лежит в том же git-репо. Содержит `.claude-plugin/plugin.json`, `.mcp.json` (запускает npm-пакет через npx), `skills/reading-large-markdown/SKILL.md`, и `.claude-plugin/marketplace.json` (single-plugin marketplace). Plugin даёт one-click установку через Claude Code marketplace + bundled skill, но не является обязательным способом использования сервера.
+2. **Claude Code plugin `markdown-docs`** (обёртка для удобства Claude Code users) — лежит в том же git-репо. Содержит `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` (single-plugin marketplace под `hacker-cb` namespace) и корневой `.mcp.json` (запускает npm-пакет через `npx -y markdown-docs-mcp@<version>`). Plugin даёт one-click установку через Claude Code marketplace, но не является обязательным способом использования сервера.
+
+**Skill в плагин НЕ входит** (решено в PR-07): tool descriptions в коде MCP-сервера (`src/schemas/descriptions.ts`) уже самодостаточны — содержат typical workflow, has_children-aware drill-down, scope-fallback hint, anomaly types и `mode="logical"` для PDF-артефактов. Skill добавил бы лишь PDF deep dive, что узко для general-markdown use case. Описания portable для других MCP-клиентов (Cursor / Continue), skill — нет.
 
 Принцип: код MCP-сервера не знает про Claude plugin. Переменные типа `${CLAUDE_PLUGIN_ROOT}` живут только в `.mcp.json` плагина, не в коде сервера. Это сохраняет MCP-сервер портабельным для других MCP-клиентов и для будущих обёрток.
 
@@ -423,32 +425,17 @@ Escape hatch — `include_comments: true` в `read_section` и `search` возв
 
 Первый view_toc на 1 MB документе — ~50-200 ms (одноразовая индексация). После — миллисекунды для любых tool-вызовов.
 
-## 8. Skill дизайн
+## 8. Skill — удалён в PR-07
 
-### 8.1 Файлы
+Skill `reading-large-markdown` исходно предполагался, но в PR-07 принято решение **не отгружать его в составе плагина**.
 
-- `skills/reading-large-markdown/SKILL.md` — основной skill, model-invoked. Без `disable-model-invocation` — должен авто-триггериться по контексту.
-- `skills/reading-large-markdown/references/pdf-converted-docs.md` — подробный гайд по PDF-конвертированным документам (progressive disclosure: подгружается только когда агент решит углубиться).
+Причины:
 
-### 8.2 Триггеры
+- Tool descriptions (`src/schemas/descriptions.ts`) после PR-06.2 / 06.3 / 06.4 уже несут весь workflow: `Typical workflow` блок в `VIEW_TOC_DESCRIPTION`, `has_children`-aware drill-down, scope-fallback hint в search, описание anomaly types и `mode="logical"` для PDF-артефактов.
+- Descriptions всегда видны агенту через `tools/list` — работают в любом MCP-клиенте (Cursor, Continue, Claude Desktop). Skill активируется только в Claude Code и только по триггерам.
+- Single deep dive, который реально не помещается в descriptions, — это PDF-конвертированные документы. Но MCP general-purpose: работает с любыми markdown (datasheets, IEC, README, manuals); PDF-handling — частный случай. Узкий skill про PDF не оправдан.
 
-Description пишется на английском (in-repo English convention). Покрывает запросы через cross-language ключевые слова — имена и типы документов (`datasheet`, `RFC`, `IEC`, `ISO`, `STM32`, `ESP32`, `specification`, `manual`, `reference`), file paths (`.md`), action verbs (`search`, `find`, `read section`, `navigate`, `look up`). Эти слова часто встречаются в русских запросах как заимствования, что даёт de-facto cross-language активацию.
-
-### 8.3 Содержание SKILL.md
-
-Описывает:
-
-- Когда использовать (большие markdown, datasheets, стандарты, reference manuals).
-- Когда НЕ использовать (явная просьба «прочитай целиком», правка файла, raw dump).
-- Workflow: view_toc → проверка anomalies_summary → analyze_document при необходимости → read_section / search.
-- Адресация только по `id` из view_toc, не по «путям» нумерации.
-- Default `mode: "raw"`, `mode: "logical"` только после явного согласия пользователя.
-- Search — grep-like, не семантический.
-- Большие разделы — drill-down через children, не `include_subsections: true` вслепую.
-
-### 8.4 Содержание references/pdf-converted-docs.md
-
-Подробности про PDF-артефакты: природа self_nesting, как использовать analyze_document, типовые сценарии переговоров с пользователем (применить фикс к файлу через Edit, использовать logical mode, оставить как есть).
+Если в будущем понадобится skill — он останется отдельным проектом и сможет переиспользовать наш MCP без изменений в этом репо.
 
 ## 9. Тестирование
 
@@ -540,11 +527,6 @@ markdown-docs-mcp/
     plugin.json
     marketplace.json
   .mcp.json
-  skills/
-    reading-large-markdown/
-      SKILL.md
-      references/
-        pdf-converted-docs.md
   src/
     index.ts                     # MCP entry, stdio transport setup
     server.ts                    # tool handlers
@@ -641,7 +623,7 @@ markdown-docs-mcp/
 
 - [x] **PR-06.3: cap-fix + env config + maxResultSizeChars** — compact JSON во всех 4 tools (cap и output теперь меряются на одном представлении), env-vars `MARKDOWN_DOCS_MAX_TOC_BYTES` / `MARKDOWN_DOCS_MAX_SECTION_BYTES` для override (defaults 50 / 200 KB, ceiling 500 KB), Claude Code `_meta["anthropic/maxResultSizeChars"]: 200000` annotation на view_toc и read_section.
 
-- [ ] **PR-07: Plugin packaging** — `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `.mcp.json`, `skills/reading-large-markdown/SKILL.md` + `references/pdf-converted-docs.md`. Manual smoke test через `claude --plugin-dir`.
+- [x] **PR-07: Plugin packaging** — `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `.mcp.json` (запускает npm-пакет через `npx -y markdown-docs-mcp@<version>`), cross-file invariants test. Skill решено не отгружать (см. section 8). Manual smoke test через `/plugin marketplace add hacker-cb/markdown-docs-mcp`.
 
 - [ ] **PR-08: Release pipeline** — GitHub Actions release workflow (test → build → npm publish → GitHub Release), release script для атомарной синхронизации версий в `package.json` / `plugin.json` / `.mcp.json`, dry-run `npm publish`, финальный README с ссылкой на pdf2md-claude.
 

@@ -1,0 +1,14 @@
+{
+  "name": "hacker-cb",
+  "owner": { "name": "hacker-cb" },
+  "plugins": [
+    {
+      "name": "markdown-docs",
+      "source": "./",
+      "description": "MCP server for efficient navigation of large markdown documents",
+      "version": "0.1.0",
+      "homepage": "https://github.com/hacker-cb/markdown-docs-mcp",
+      "license": "MIT"
+    }
+  ]
+}
