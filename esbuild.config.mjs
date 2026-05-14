@@ -11,6 +11,9 @@ await build({
   banner: {
     js: "#!/usr/bin/env node",
   },
+  // gray-matter uses dynamic require("fs") internally which esbuild cannot bundle
+  // in ESM mode — mark it external so Node resolves it from node_modules at runtime.
+  external: ["gray-matter"],
   // esbuild does not set the executable bit; we do it below so
   // `npx markdown-docs-mcp` works after install.
   legalComments: "linked",

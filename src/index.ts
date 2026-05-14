@@ -1,8 +1,10 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createServer } from "./server.js";
+import { IndexCache } from "./index/cache.js";
 
 async function main() {
-  const server = createServer();
+  const cache = new IndexCache();
+  const server = createServer({ cache });
   const transport = new StdioServerTransport();
   await server.connect(transport);
   // Server runs until stdin closes or the process receives a termination signal.

@@ -74,4 +74,40 @@ describe("buildIndex", () => {
   it("throws on non-existent file", async () => {
     await expect(buildIndex("/no/such/file.md")).rejects.toBeDefined();
   });
+
+  it("populates pdf_pages on TocNode from adjacent PDF markers", async () => {
+    await withTmpFile(
+      "<!-- PDF_PAGE_BEGIN 12 -->\n# Heading\nbody\n<!-- PDF_PAGE_END 12 -->\n# Other\n",
+      async (path) => {
+        const idx = await buildIndex(path);
+        expect(idx.toc[0]?.pdf_pages).toEqual([12]);
+      }
+    );
+  });
+
+  it("flags self-nesting heading and exposes it in anomalies", async () => {
+    await withTmpFile(
+      "# Foo\n\n## Bar\n\n### Foo\nbody\n",
+      async (path) => {
+        const idx = await buildIndex(path);
+        const found = (function walk(nodes: typeof idx.toc): boolean {
+          return nodes.some(
+            (n) =>
+              (n.is_likely_artifact && /self_nesting/.test(n.artifact_reason ?? "")) ||
+              walk(n.children)
+          );
+        })(idx.toc);
+        expect(found).toBe(true);
+        expect(idx.anomalies.some((a) => a.type === "self_nesting_header")).toBe(true);
+      }
+    );
+  });
+
+  it("Index has anomalies and pdf_markers arrays", async () => {
+    await withTmpFile("# H\nbody\n", async (path) => {
+      const idx = await buildIndex(path);
+      expect(Array.isArray(idx.anomalies)).toBe(true);
+      expect(Array.isArray(idx.pdf_markers)).toBe(true);
+    });
+  });
 });

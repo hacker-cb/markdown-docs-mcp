@@ -1,6 +1,15 @@
-import { NotImplementedError } from "../lib/errors.js";
+import type { IndexCache } from "../index/cache.js";
 import type { ViewTocInput } from "../schemas/inputs.js";
+import { buildViewTocResponse } from "./view_toc_response.js";
 
-export async function viewToc(_input: ViewTocInput): Promise<never> {
-  throw new NotImplementedError("view_toc");
+export function makeViewTocHandler(cache: IndexCache) {
+  return async function viewToc(input: ViewTocInput): Promise<{
+    content: Array<{ type: "text"; text: string }>;
+  }> {
+    const index = await cache.getOrBuild(input.file_path);
+    const response = buildViewTocResponse(index, input);
+    return {
+      content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
+    };
+  };
 }

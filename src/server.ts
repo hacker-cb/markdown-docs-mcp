@@ -1,6 +1,6 @@
 // MCP server factory. Registers four tools with self-contained descriptions
-// and Zod-validated inputs. All handlers currently throw NotImplementedError
-// — real implementations land in PR-04 onward.
+// and Zod-validated inputs. view_toc is fully implemented; the other three
+// remain stubs (NotImplementedError) until PR-05+.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
@@ -15,16 +15,22 @@ import {
   SEARCH_DESCRIPTION,
   ANALYZE_DOCUMENT_DESCRIPTION,
 } from "./schemas/descriptions.js";
-import { viewToc } from "./tools/view_toc.js";
+import { makeViewTocHandler } from "./tools/view_toc.js";
 import { readSection } from "./tools/read_section.js";
 import { search } from "./tools/search.js";
 import { analyzeDocument } from "./tools/analyze_document.js";
+import { IndexCache } from "./index/cache.js";
 
-export function createServer(): McpServer {
+export type ServerDeps = { cache?: IndexCache };
+
+export function createServer(deps: ServerDeps = {}): McpServer {
+  const cache = deps.cache ?? new IndexCache();
   const server = new McpServer({
     name: "markdown-docs",
     version: "0.1.0",
   });
+
+  const viewTocHandler = makeViewTocHandler(cache);
 
   // registerTool(name, config, callback) — preferred non-deprecated API in SDK 1.29.
   // inputSchema accepts a full Zod object schema (AnySchema); SDK converts it to
@@ -37,9 +43,7 @@ export function createServer(): McpServer {
       description: VIEW_TOC_DESCRIPTION,
       inputSchema: viewTocInput,
     },
-    async (args) => {
-      return await viewToc(args);
-    }
+    async (args) => viewTocHandler(args)
   );
 
   server.registerTool(

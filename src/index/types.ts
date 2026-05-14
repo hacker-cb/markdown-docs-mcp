@@ -1,4 +1,6 @@
 import type { CommentRange } from "../parser/comments.js";
+import type { Anomaly } from "../anomalies/types.js";
+import type { PdfMarker } from "../parser/pdf_pages.js";
 
 export type TocNode = {
   id: string;                  // "s<line>"
@@ -8,7 +10,9 @@ export type TocNode = {
   line: number;
   line_end: number;
   section_lines: number;
-  is_likely_artifact: false;   // in PR-03 always false; real flag in PR-04
+  is_likely_artifact: boolean; // false by default; set to true by detector for self_nesting
+  artifact_reason?: string;
+  pdf_pages?: number[];
   children: TocNode[];
 };
 
@@ -31,6 +35,8 @@ export type Index = {
   flat_headers: FlatHeader[];
   comment_ranges: CommentRange[];
   frontmatter: Record<string, unknown> | undefined;
+  anomalies: Anomaly[];
+  pdf_markers: PdfMarker[];
 };
 
-export type { CommentRange };
+export type { CommentRange, PdfMarker, Anomaly };

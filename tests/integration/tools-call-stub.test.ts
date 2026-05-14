@@ -1,14 +1,14 @@
 // tests/integration/tools-call-stub.test.ts
-// Verifies that each tool stub returns an error response (not_implemented) when called.
+// Verifies that stub tools return an error response (not_implemented) when called.
+// view_toc is now real (implemented in PR-04) and is NOT in this list.
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createServer } from "../../src/server.js";
 
-// Minimal valid args for each tool (satisfying required Zod fields).
+// Minimal valid args for each stub tool (satisfying required Zod fields).
 const TOOL_ARGS: Record<string, Record<string, unknown>> = {
-  view_toc: { file_path: "/tmp/test.md" },
   read_section: { file_path: "/tmp/test.md", section_id: "s1" },
   search: { file_path: "/tmp/test.md", query: "hello" },
   analyze_document: { file_path: "/tmp/test.md" },
