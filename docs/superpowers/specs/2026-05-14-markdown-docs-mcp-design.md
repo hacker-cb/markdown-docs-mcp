@@ -634,7 +634,7 @@ markdown-docs-mcp/
 
 - [x] **PR-06: search + analyze_document** — оба оставшихся tool'а. `search` с `scope`, `regex`, `case_sensitive`, `context_lines`. `analyze_document` с `logical_effect` и `adjacent_pdf_markers`. Integration tests.
 
-- [x] **PR-06.1: Huge documents support** — view_toc cap + start_id, JSON compression, consecutive_pair_header anomaly, TRM stress fixture. (Подробности: docs/superpowers/specs/2026-05-14-huge-documents-support-design.md)
+- [x] **PR-06.1: Huge documents support** — view_toc cap + start_id, JSON compression, consecutive_pair_header anomaly, TRM stress fixture.
 
 - [x] **PR-06.2: has_children + workflow hint** — view_toc nodes carry has_children:true when children were trimmed; description gains workflow block. (Refinement of PR-06.1 after manual testing.)
 
