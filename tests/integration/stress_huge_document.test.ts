@@ -66,6 +66,10 @@ describe("stress: huge document (ESP32-P4 TRM)", () => {
       expect(parsed["effective_depth"]).toBeDefined();
       expect(typeof parsed["hint"]).toBe("string");
       expect(parsed["hint"] as string).toMatch(/start_id|depth/i);
+      // TRM has many h1 chapters with children — at least some top-level nodes
+      // must carry has_children=true when the depth cap trimmed their subtrees.
+      const toc = parsed["toc"] as Array<Record<string, unknown>>;
+      expect(toc.some((n) => n["has_children"] === true)).toBe(true);
     },
     30_000
   );

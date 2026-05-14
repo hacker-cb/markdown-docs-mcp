@@ -22,6 +22,7 @@ interface TocNode {
   title: string;
   children?: TocNode[];         // omitted when empty (compact form)
   is_likely_artifact?: true;    // omitted when false (compact form)
+  has_children?: true;          // present only when children were trimmed by depth cap
 }
 
 interface ViewTocResponse {
@@ -103,6 +104,8 @@ describe("view_toc integration", () => {
         // depth=1 means no children returned; compact form omits the field entirely
         expect(node.children).toBeUndefined();
       }
+      // STM32 has nested sections; nodes with children trimmed must carry has_children=true
+      expect(parsed.toc.some((n) => n.has_children === true)).toBe(true);
     },
     60000
   );

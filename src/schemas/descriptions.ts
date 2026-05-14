@@ -5,7 +5,12 @@
 
 export const VIEW_TOC_DESCRIPTION = `Returns the table of contents of a large markdown file as a tree of headings.
 
-Each node has: opaque id (format: s<line>), level (1-6), title, optional numbering ("4.1.2"), line/line_end range, section size in lines. Fields is_likely_artifact and children are omitted when their default values apply (false / empty). The response includes file metadata, optional YAML frontmatter, and anomalies_summary.
+Typical workflow:
+1. view_toc(file_path) — get document overview (server-capped at 25 KB).
+2. Pick a node by id from toc[]. Nodes with has_children=true have deeper structure that was not included in this response.
+3. To explore deeper: view_toc(file_path, start_id) for the subtree, or read_section(file_path, section_id) to read content + a children mini-TOC.
+
+Each node has: opaque id (format: s<line>), level (1-6), title, optional numbering ("4.1.2"), line/line_end range, section size in lines. Fields is_likely_artifact, has_children, and children are omitted when their default values apply (false / not trimmed / empty). has_children=true (only present when children were trimmed by the depth cap) signals that the node has deeper structure not included in this response. The response includes file metadata, optional YAML frontmatter, and anomalies_summary.
 
 For very large documents the server auto-reduces depth to keep the response under 25 KB and sets truncated=true, effective_depth=N, and hint="Tree trimmed from depth D to N; use start_id=<id> to drill deeper." When even depth=1 is too large, a prefix of root nodes is returned with a matching hint. Use start_id to navigate into a subtree: pass an id from a previous view_toc call and toc[] will contain that node's immediate children.
 

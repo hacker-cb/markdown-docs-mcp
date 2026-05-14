@@ -1,6 +1,6 @@
 import type { Index, TocNode } from "../index/types.js";
 import type { ViewTocInput } from "../schemas/inputs.js";
-import { compactTocNode, type CompactTocNode } from "./_compact.js";
+import { compactTocNodeAtDepth, type CompactTocNode } from "./_compact.js";
 
 const MAX_VIEW_TOC_BYTES = 25 * 1024; // 25 KB
 
@@ -39,27 +39,10 @@ function findNodeById(nodes: TocNode[], id: string): TocNode | undefined {
  * Trims a TocNode tree to a given depth and compacts it.
  * depth=1 means: include the root node but no children.
  * depth=2 means: include root and its children but no grandchildren.
+ * Nodes whose children were trimmed carry has_children=true.
  */
 function trimAndCompact(nodes: TocNode[], depth: number): CompactTocNode[] {
-  return nodes.map((node) => trimNodeAndCompact(node, depth));
-}
-
-function trimNodeAndCompact(node: TocNode, depth: number): CompactTocNode {
-  const base = compactTocNode(node);
-  if (depth <= 1) {
-    // Drop children at this level
-    const { children: _dropped, ...rest } = base;
-    void _dropped;
-    return rest;
-  }
-  // Recurse into children at depth - 1
-  if (node.children.length > 0) {
-    return {
-      ...base,
-      children: node.children.map((c) => trimNodeAndCompact(c, depth - 1)),
-    };
-  }
-  return base;
+  return nodes.map((node) => compactTocNodeAtDepth(node, depth));
 }
 
 /**

@@ -162,6 +162,7 @@ type TocNode = {
   section_lines: number,       // line_end - line + 1, физический размер
   is_likely_artifact: boolean,
   artifact_reason?: string,
+  has_children?: true,         // присутствует только если дети были обрезаны depth cap'ом
   children: TocNode[],
 }
 ```
@@ -617,6 +618,8 @@ markdown-docs-mcp/
 - [x] **PR-06: search + analyze_document** — оба оставшихся tool'а. `search` с `scope`, `regex`, `case_sensitive`, `context_lines`. `analyze_document` с `logical_effect` и `adjacent_pdf_markers`. Integration tests.
 
 - [x] **PR-06.1: Huge documents support** — view_toc cap + start_id, JSON compression, consecutive_pair_header anomaly, TRM stress fixture. (Подробности: docs/superpowers/specs/2026-05-14-huge-documents-support-design.md)
+
+- [x] **PR-06.2: has_children + workflow hint** — view_toc nodes carry has_children:true when children were trimmed; description gains workflow block. (Refinement of PR-06.1 after manual testing.)
 
 - [ ] **PR-07: Plugin packaging** — `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `.mcp.json`, `skills/reading-large-markdown/SKILL.md` + `references/pdf-converted-docs.md`. Manual smoke test через `claude --plugin-dir`.
 

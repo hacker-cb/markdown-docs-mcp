@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { compactTocNode } from "../../../src/tools/_compact.js";
+import { compactTocNode, compactTocNodeAtDepth } from "../../../src/tools/_compact.js";
 import type { TocNode } from "../../../src/index/types.js";
 
 function mkNode(overrides: Partial<TocNode> = {}): TocNode {
@@ -68,5 +68,36 @@ describe("compactTocNode", () => {
     const full = JSON.stringify(node);
     const compact = JSON.stringify(compactTocNode(node));
     expect(compact.length).toBeLessThan(full.length);
+  });
+});
+
+describe("compactTocNodeAtDepth", () => {
+  it("sets has_children=true and omits children when remainingDepth=1 and node has children", () => {
+    const child = mkNode({ id: "s3", line: 3, line_end: 5 });
+    const root = mkNode({ children: [child] });
+    const result = compactTocNodeAtDepth(root, 1);
+    expect(result.has_children).toBe(true);
+    expect(result.children).toBeUndefined();
+  });
+
+  it("recurses into children when remainingDepth=2; grandchildren with children get has_children", () => {
+    const grandchild = mkNode({ id: "s5", line: 5, line_end: 8, children: [mkNode({ id: "s9", line: 9, line_end: 10 })] });
+    const child = mkNode({ id: "s3", line: 3, line_end: 10, children: [grandchild] });
+    const root = mkNode({ children: [child] });
+    const result = compactTocNodeAtDepth(root, 2);
+    // root should have children array (depth 2 allows one level of children)
+    expect(result.children).toBeDefined();
+    expect(result.has_children).toBeUndefined();
+    // child at depth=1 has grandchildren trimmed → has_children=true
+    const resultChild = result.children![0]!;
+    expect(resultChild.has_children).toBe(true);
+    expect(resultChild.children).toBeUndefined();
+  });
+
+  it("does not set has_children on a leaf node with remainingDepth=1", () => {
+    const leaf = mkNode({ children: [] });
+    const result = compactTocNodeAtDepth(leaf, 1);
+    expect(result.has_children).toBeUndefined();
+    expect(result.children).toBeUndefined();
   });
 });
