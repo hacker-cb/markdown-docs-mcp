@@ -4,6 +4,17 @@ import type { Index } from "../../../src/index/types.js";
 import type { TocNode, FlatHeader } from "../../../src/index/types.js";
 
 // Helper: build a minimal Index manually (avoiding the real builder for unit isolation).
+function collectNodes(toc: TocNode[]): Map<string, TocNode> {
+  const m = new Map<string, TocNode>();
+  const stack = [...toc];
+  while (stack.length > 0) {
+    const n = stack.pop()!;
+    m.set(n.id, n);
+    for (const c of n.children) stack.push(c);
+  }
+  return m;
+}
+
 function mkIndex(opts: {
   toc: TocNode[];
   flat: FlatHeader[];
@@ -24,7 +35,7 @@ function mkIndex(opts: {
     frontmatter: undefined,
     anomalies: [],
     pdf_markers: opts.pdf_markers ?? [],
-    node_by_id: new Map(),
+    node_by_id: collectNodes(opts.toc),
     flat_index_by_id: new Map(opts.flat.map((h, i) => [h.id, i])),
     line_section_map: [],
   };

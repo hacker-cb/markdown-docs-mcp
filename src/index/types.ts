@@ -49,6 +49,10 @@ export type Index = {
   anomalies: Anomaly[];
   pdf_markers: PdfMarker[];
   // O(1) lookups built once in buildIndex; consumed by response builders + detector.
+  // ReadonlyMap protects the map structure but NOT the TocNode values stored in it
+  // — node_by_id and toc share the same TocNode instances. The only sanctioned
+  // mutation is is_likely_artifact / artifact_reason inside buildIndex itself
+  // (anomaly post-processing); response builders treat values as read-only.
   node_by_id: ReadonlyMap<string, TocNode>;
   flat_index_by_id: ReadonlyMap<string, number>;
   line_section_map: ReadonlyArray<SectionInfo | null>;

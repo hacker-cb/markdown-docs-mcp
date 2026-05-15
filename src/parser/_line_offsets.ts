@@ -12,8 +12,11 @@ export function computeLineOffsets(content: string): number[] {
 }
 
 // Returns the 1-based line number containing the given char offset.
-// Precondition: offset is within [0, content.length). For offset === 0,
-// returns 1. For offset === lineOffsets[i], returns i + 1.
+// Precondition: offset >= 0. Typical callers pass an offset within
+// [0, content.length); offset === content.length still returns a coherent
+// line number (the last entry of lineOffsets, or the trailing-newline
+// phantom line) — no clamping needed. For offset === 0 returns 1; for
+// offset === lineOffsets[i] returns i + 1.
 export function lineOfOffsetBinary(
   lineOffsets: number[],
   offset: number
