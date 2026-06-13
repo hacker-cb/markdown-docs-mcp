@@ -44,15 +44,16 @@ export function normalizeVersion(input) {
  */
 export function applyVersionToFiles(version, files) {
   const v = normalizeVersion(version);
-  const out = {};
 
   const pkg = files["package.json"];
   if (!pkg || typeof pkg !== "object") {
     throw new Error("package.json missing or not an object");
   }
-  out["package.json"] = { ...pkg, version: v };
 
-  return out;
+  // Spread the input first so any other entries the caller passed survive —
+  // only package.json is rewritten. Honors the documented "same map with
+  // versions updated" contract even if reused with a broader file set.
+  return { ...files, "package.json": { ...pkg, version: v } };
 }
 
 function readJson(rel) {
