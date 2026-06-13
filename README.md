@@ -24,13 +24,16 @@ The plugin is distributed from the
 /plugin install markdown-docs@hacker-cb-plugins
 ```
 
-The plugin installs into user scope by default. To install for a team-shared
-project instead (writes `.claude/settings.json` in the project), pass
-`--scope project` to the second command:
+The plugin installs into user scope by default. For a team-shared **project**
+install (writes `.claude/settings.json`), use the `claude` CLI — the in-session
+`/plugin install` slash command has no `--scope` flag:
 
 ```
-/plugin install markdown-docs@hacker-cb-plugins --scope project
+claude plugin install markdown-docs@hacker-cb-plugins --scope project
 ```
+
+Or pick the scope interactively: run `/plugin`, open the **Discover** tab, and
+press **Enter** on the plugin (User / Project / Local).
 
 ### Direct MCP config (any MCP-compatible client)
 
