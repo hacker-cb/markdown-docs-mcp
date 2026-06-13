@@ -107,7 +107,7 @@ pnpm build
 
 ## Releasing
 
-Versions live in two places that must stay in lockstep: `package.json` and `.mcp.json` (`args[1]`). `scripts/release.mjs` bumps them atomically and creates a `release: vX.Y.Z` commit plus a `vX.Y.Z` tag. From `master`:
+The version lives in `package.json`. `scripts/release.mjs` bumps it and creates a `release: vX.Y.Z` commit plus a `vX.Y.Z` tag. From `master`:
 
 ```bash
 pnpm release --dry-run 0.2.0    # preview diff

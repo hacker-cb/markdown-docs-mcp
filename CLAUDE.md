@@ -10,11 +10,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `pnpm typecheck` — `tsc --noEmit`. Fast feedback while developing.
 - `pnpm build` — esbuild bundle to `dist/index.js`. `gray-matter` is intentionally `external` (its `require("fs")` does not survive ESM bundling).
 - `pnpm dev` — `tsx src/index.ts` for local stdio MCP without a build step.
-- `pnpm release [--dry-run] [--force] <version>` — atomic version sync across the two version files (see "Version sync" below). `--dry-run` previews; `--force` skips the "must be on master" guard for rehearsal.
+- `pnpm release [--dry-run] [--force] <version>` — bump the version in package.json + create the `release: vX.Y.Z` commit and tag (see "Version sync" below). `--dry-run` previews; `--force` skips the "must be on master" guard for rehearsal.
 
 ## Architecture
 
-Four-tool MCP server (stdio, `@modelcontextprotocol/sdk` 1.29) for navigating large markdown documents. The server is the **primary artefact** and the only thing this repo ships (npm package + the bundled `.mcp.json`). The Claude Code plugin that wraps `npx markdown-docs-mcp@<version>` lives separately, in the [`hacker-cb/claude-code-plugins`](https://github.com/hacker-cb/claude-code-plugins) marketplace. The MCP works in any MCP-compatible client (Cursor, Continue, Claude Desktop) — keep server code free of Claude-specific knowledge.
+Four-tool MCP server (stdio, `@modelcontextprotocol/sdk` 1.29) for navigating large markdown documents. The server is the **primary artefact** and the only thing this repo ships (the npm package). The Claude Code plugin that wraps `npx markdown-docs-mcp@<version>` lives separately, in the [`hacker-cb/claude-code-plugins`](https://github.com/hacker-cb/claude-code-plugins) marketplace. The MCP works in any MCP-compatible client (Cursor, Continue, Claude Desktop) — keep server code free of Claude-specific knowledge.
 
 ### Layering (request flow)
 
@@ -63,12 +63,9 @@ Detector reports five types: `self_nesting_header`, `level_jump`, `orphan_subhea
 
 ### Version sync
 
-`scripts/release.mjs` keeps the version in lockstep across two files (via `applyVersionToFiles`, pure-tested in `tests/unit/release_script.test.ts`):
+`package.json` is the **single** version source. `scripts/release.mjs` bumps it (via `applyVersionToFiles`, pure-tested in `tests/unit/release_script.test.ts`) and creates the `release: vX.Y.Z` commit + tag.
 
-1. `package.json` → `.version`
-2. `.mcp.json` → `.mcpServers["markdown-docs"].args[]` (the `markdown-docs-mcp@<version>` entry)
-
-`src/server.ts` reads `package.json.version` at runtime via `import.meta.url`, and the `tools-list.test.ts` integration test asserts `client.getServerVersion().version === package.json.version`. `tests/unit/mcp_config.test.ts` asserts `.mcp.json` pins the same package + version as `package.json`; `.github/workflows/release.yml` re-verifies tag↔files agreement on `v*` push before `npm publish --provenance --access public` via npm Trusted Publisher (OIDC; no `NPM_TOKEN` secret).
+`src/server.ts` reads `package.json.version` at runtime via `import.meta.url`, and the `tools-list.test.ts` integration test asserts `client.getServerVersion().version === package.json.version`. `.github/workflows/release.yml` re-verifies that the pushed `v*` tag matches `package.json.version` before `npm publish --provenance --access public` via npm Trusted Publisher (OIDC; no `NPM_TOKEN` secret).
 
 ## Branching
 
