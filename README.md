@@ -15,11 +15,13 @@ Lets agents read what they need from a 100 000+ line markdown file without dumpi
 
 ### Claude Code plugin
 
-Run inside a Claude Code session:
+The plugin is distributed from the
+[`hacker-cb-plugins`](https://github.com/hacker-cb/claude-code-plugins) marketplace
+(this repo ships only the MCP server + npm package). Run inside a Claude Code session:
 
 ```
-/plugin marketplace add hacker-cb/markdown-docs-mcp
-/plugin install markdown-docs@hacker-cb
+/plugin marketplace add hacker-cb/claude-code-plugins
+/plugin install markdown-docs@hacker-cb-plugins
 ```
 
 The plugin installs into user scope by default. To install for a team-shared
@@ -27,7 +29,7 @@ project instead (writes `.claude/settings.json` in the project), pass
 `--scope project` to the second command:
 
 ```
-/plugin install markdown-docs@hacker-cb --scope project
+/plugin install markdown-docs@hacker-cb-plugins --scope project
 ```
 
 ### Direct MCP config (any MCP-compatible client)
@@ -102,7 +104,7 @@ pnpm build
 
 ## Releasing
 
-Versions live in four places that must stay in lockstep: `package.json`, `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` (`plugins[0].version`), and `.mcp.json` (`args[1]`). `scripts/release.mjs` bumps them atomically and creates a `release: vX.Y.Z` commit plus a `vX.Y.Z` tag. From `master`:
+Versions live in two places that must stay in lockstep: `package.json` and `.mcp.json` (`args[1]`). `scripts/release.mjs` bumps them atomically and creates a `release: vX.Y.Z` commit plus a `vX.Y.Z` tag. From `master`:
 
 ```bash
 pnpm release --dry-run 0.2.0    # preview diff

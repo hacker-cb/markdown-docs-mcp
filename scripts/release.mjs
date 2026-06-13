@@ -1,8 +1,6 @@
 #!/usr/bin/env node
-// Atomically bump the project version across the four places it lives:
+// Atomically bump the project version across the two places it lives:
 //   - package.json
-//   - .claude-plugin/plugin.json
-//   - .claude-plugin/marketplace.json (plugins[0].version)
 //   - .mcp.json (mcpServers.markdown-docs.args[1], formatted as "<pkg>@<ver>")
 //
 // Then create a `release: v<version>` commit and a `v<version>` tag. The push
@@ -58,30 +56,6 @@ export function applyVersionToFiles(version, files) {
     throw new Error("package.json missing or not an object");
   }
   out["package.json"] = { ...pkg, version: v };
-
-  const plugin = files[".claude-plugin/plugin.json"];
-  if (!plugin || typeof plugin !== "object") {
-    throw new Error(".claude-plugin/plugin.json missing or not an object");
-  }
-  out[".claude-plugin/plugin.json"] = { ...plugin, version: v };
-
-  const market = files[".claude-plugin/marketplace.json"];
-  if (!market || !Array.isArray(market.plugins) || market.plugins.length === 0) {
-    throw new Error(".claude-plugin/marketplace.json missing or has no plugins[]");
-  }
-  // Hard assert: we ship a single-plugin marketplace. If a second entry is
-  // added later, the silent-drift this script exists to prevent would
-  // reappear (later entries would keep their old version). Fail loudly so
-  // the maintainer revisits the strategy instead of silently shipping stale.
-  if (market.plugins.length !== 1) {
-    throw new Error(
-      `.claude-plugin/marketplace.json: expected exactly 1 plugin entry, found ${market.plugins.length}. Extend release.mjs before adding more.`
-    );
-  }
-  out[".claude-plugin/marketplace.json"] = {
-    ...market,
-    plugins: [{ ...market.plugins[0], version: v }],
-  };
 
   const mcp = files[".mcp.json"];
   const server = mcp?.mcpServers?.[MCP_SERVER_KEY];
@@ -146,8 +120,6 @@ function main(argv) {
 
   const paths = [
     "package.json",
-    ".claude-plugin/plugin.json",
-    ".claude-plugin/marketplace.json",
     ".mcp.json",
   ];
   const before = Object.fromEntries(paths.map((p) => [p, readJson(p)]));

@@ -36,11 +36,11 @@ describe("tools/list", () => {
     expect(tools).toHaveLength(4);
   });
 
-  it("MCP server reports the same version as package.json (no fifth drift surface)", () => {
-    // scripts/release.mjs syncs four files (package.json, plugin.json,
-    // marketplace.json, .mcp.json). The server name+version reported on
-    // every initialize MUST match — otherwise the npm artifact and the
-    // advertised version disagree, defeating the atomic-sync apparatus.
+  it("MCP server reports the same version as package.json (no version drift surface)", () => {
+    // scripts/release.mjs syncs the version across package.json and .mcp.json.
+    // The server name+version reported on every initialize MUST match —
+    // otherwise the npm artifact and the advertised version disagree,
+    // defeating the atomic-sync apparatus.
     // Use the MCP `initialize` response shape exposed by the SDK client.
     const info = client.getServerVersion();
     expect(info?.name).toBe("markdown-docs");

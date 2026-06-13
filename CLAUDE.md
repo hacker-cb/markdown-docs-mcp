@@ -10,11 +10,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `pnpm typecheck` — `tsc --noEmit`. Fast feedback while developing.
 - `pnpm build` — esbuild bundle to `dist/index.js`. `gray-matter` is intentionally `external` (its `require("fs")` does not survive ESM bundling).
 - `pnpm dev` — `tsx src/index.ts` for local stdio MCP without a build step.
-- `pnpm release [--dry-run] [--force] <version>` — atomic version sync across the four version sources (see "Release flow" below). `--dry-run` previews; `--force` skips the "must be on master" guard for rehearsal.
+- `pnpm release [--dry-run] [--force] <version>` — atomic version sync across the two version files (see "Version sync" below). `--dry-run` previews; `--force` skips the "must be on master" guard for rehearsal.
 
 ## Architecture
 
-Four-tool MCP server (stdio, `@modelcontextprotocol/sdk` 1.29) for navigating large markdown documents. The server is the **primary artefact**; the Claude Code plugin under `.claude-plugin/` is a thin wrapper around `npx markdown-docs-mcp@<version>`. The MCP works in any MCP-compatible client (Cursor, Continue, Claude Desktop) — keep server code free of Claude-specific knowledge.
+Four-tool MCP server (stdio, `@modelcontextprotocol/sdk` 1.29) for navigating large markdown documents. The server is the **primary artefact** and the only thing this repo ships (npm package + the bundled `.mcp.json`). The Claude Code plugin that wraps `npx markdown-docs-mcp@<version>` lives separately, in the [`hacker-cb/claude-code-plugins`](https://github.com/hacker-cb/claude-code-plugins) marketplace. The MCP works in any MCP-compatible client (Cursor, Continue, Claude Desktop) — keep server code free of Claude-specific knowledge.
 
 ### Layering (request flow)
 
@@ -61,17 +61,14 @@ The pure/adapter split is load-bearing — every `build*Response()` is testable 
 
 Detector reports five types: `self_nesting_header`, `level_jump`, `orphan_subheader`, `empty_section`, `consecutive_pair_header`. The last two also feed `is_likely_artifact = true` on the corresponding `TocNode`, which `read_section(mode: "logical")` uses to absorb adjacent artefacts past `raw_line_end`. Logical mode is opt-in; raw is the default. `adjacent_pdf_markers` (e.g. `"L3932 PDF_PAGE_END 38"`) is independent evidence of PDF-conversion origin used by the `analyze_document` report.
 
-### Version sync — five sources
+### Version sync
 
-`scripts/release.mjs` keeps these in lockstep (via `applyVersionToFiles`, pure-tested in `tests/unit/release_script.test.ts`):
+`scripts/release.mjs` keeps the version in lockstep across two files (via `applyVersionToFiles`, pure-tested in `tests/unit/release_script.test.ts`):
 
 1. `package.json` → `.version`
-2. `.claude-plugin/plugin.json` → `.version`
-3. `.claude-plugin/marketplace.json` → `.plugins[0].version` (script asserts `plugins.length === 1`)
-4. `.mcp.json` → `.mcpServers["markdown-docs"].args[]` (the `markdown-docs-mcp@<version>` entry)
-5. `src/server.ts` reads `package.json.version` at runtime via `import.meta.url`. The `tools-list.test.ts` integration test asserts `client.getServerVersion().version === package.json.version`.
+2. `.mcp.json` → `.mcpServers["markdown-docs"].args[]` (the `markdown-docs-mcp@<version>` entry)
 
-`tests/unit/plugin_manifest.test.ts` cross-checks the four files; `.github/workflows/release.yml` re-verifies tag↔files agreement on `v*` push before `npm publish --provenance --access public` via npm Trusted Publisher (OIDC; no `NPM_TOKEN` secret).
+`src/server.ts` reads `package.json.version` at runtime via `import.meta.url`, and the `tools-list.test.ts` integration test asserts `client.getServerVersion().version === package.json.version`. `tests/unit/mcp_config.test.ts` asserts `.mcp.json` pins the same package + version as `package.json`; `.github/workflows/release.yml` re-verifies tag↔files agreement on `v*` push before `npm publish --provenance --access public` via npm Trusted Publisher (OIDC; no `NPM_TOKEN` secret).
 
 ## Branching
 
