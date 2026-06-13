@@ -2,7 +2,7 @@ name: release
 
 # Fires on any pushed `v*` release tag (the trigger does not constrain the
 # branch — by convention tags are cut on master via scripts/release.mjs, which
-# produces the two-file version bump + tag). This workflow takes it from there:
+# produces the version bump + tag). This workflow takes it from there:
 # re-run the full test matrix, build, then publish to npm via Trusted
 # Publisher (OIDC, no NPM_TOKEN secret) and create a GitHub Release.
 
@@ -63,7 +63,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify tag matches the version invariant
+      - name: Verify tag matches package.json version
         # Defends against pushing a `v*` tag from a commit where scripts/release.mjs
         # wasn't run (or was run with a different version). Without this guard,
         # `npm publish` would happily ship whatever version package.json contains
@@ -71,22 +71,13 @@ jobs:
         run: |
           set -euo pipefail
           TAG_VERSION="${GITHUB_REF_NAME#v}"
-          echo "Tag: ${GITHUB_REF_NAME} → expected version ${TAG_VERSION}"
-          node -e '
-            const fs = require("fs");
-            const expected = process.argv[1];
-            const sources = {
-              "package.json": JSON.parse(fs.readFileSync("package.json", "utf8")).version,
-              ".mcp.json": (JSON.parse(fs.readFileSync(".mcp.json", "utf8")).mcpServers["markdown-docs"].args.find(a => typeof a === "string" && a.startsWith("markdown-docs-mcp@")) || "").split("@")[1],
-            };
-            const bad = Object.entries(sources).filter(([, v]) => v !== expected);
-            if (bad.length > 0) {
-              console.error(`Tag ${process.argv[1]} does not match all version sources:`);
-              for (const [f, v] of Object.entries(sources)) console.error(`  ${f}: ${v}`);
-              process.exit(1);
-            }
-            console.log(`Both files agree on version ${expected}.`);
-          ' "${TAG_VERSION}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          echo "Tag: ${GITHUB_REF_NAME} → expected ${TAG_VERSION}; package.json: ${PKG_VERSION}"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match package.json version ${PKG_VERSION}"
+            exit 1
+          fi
+          echo "package.json agrees on version ${TAG_VERSION}."
 
       - name: Typecheck
         run: pnpm typecheck

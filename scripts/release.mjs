@@ -1,9 +1,6 @@
 #!/usr/bin/env node
-// Atomically bump the project version across the two places it lives:
-//   - package.json
-//   - .mcp.json (mcpServers.markdown-docs.args[1], formatted as "<pkg>@<ver>")
-//
-// Then create a `release: v<version>` commit and a `v<version>` tag. The push
+// Bump the project version in package.json (the single version source), then
+// create a `release: v<version>` commit and a `v<version>` tag. The push
 // itself stays manual — `git push --follow-tags origin master` — so the author
 // can review the commit before CI starts publishing.
 //
@@ -22,8 +19,6 @@ import { execSync } from "node:child_process";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = resolve(__dirname, "..");
-const PKG_NAME = "markdown-docs-mcp";
-const MCP_SERVER_KEY = "markdown-docs";
 
 // Pragmatic subset of semver, not the full spec. Accepts MAJOR.MINOR.PATCH
 // with an optional `-prerelease` suffix limited to [\w.]. Build metadata
@@ -49,39 +44,16 @@ export function normalizeVersion(input) {
  */
 export function applyVersionToFiles(version, files) {
   const v = normalizeVersion(version);
-  const out = {};
 
   const pkg = files["package.json"];
   if (!pkg || typeof pkg !== "object") {
     throw new Error("package.json missing or not an object");
   }
-  out["package.json"] = { ...pkg, version: v };
 
-  const mcp = files[".mcp.json"];
-  const server = mcp?.mcpServers?.[MCP_SERVER_KEY];
-  if (!server || !Array.isArray(server.args)) {
-    throw new Error(
-      `.mcp.json: mcpServers["${MCP_SERVER_KEY}"].args[] not found`
-    );
-  }
-  const newArgs = [...server.args];
-  // args looks like ["-y", "markdown-docs-mcp@0.1.0"] — replace the @-tagged entry.
-  const pkgArgIdx = newArgs.findIndex((a) => typeof a === "string" && a.startsWith(`${PKG_NAME}@`));
-  if (pkgArgIdx === -1) {
-    throw new Error(
-      `.mcp.json args[] does not contain a "${PKG_NAME}@<version>" entry`
-    );
-  }
-  newArgs[pkgArgIdx] = `${PKG_NAME}@${v}`;
-  out[".mcp.json"] = {
-    ...mcp,
-    mcpServers: {
-      ...mcp.mcpServers,
-      [MCP_SERVER_KEY]: { ...server, args: newArgs },
-    },
-  };
-
-  return out;
+  // Spread the input first so any other entries the caller passed survive —
+  // only package.json is rewritten. Honors the documented "same map with
+  // versions updated" contract even if reused with a broader file set.
+  return { ...files, "package.json": { ...pkg, version: v } };
 }
 
 function readJson(rel) {
@@ -118,10 +90,7 @@ function main(argv) {
   }
   const version = normalizeVersion(positional[0]);
 
-  const paths = [
-    "package.json",
-    ".mcp.json",
-  ];
+  const paths = ["package.json"];
   const before = Object.fromEntries(paths.map((p) => [p, readJson(p)]));
   const after = applyVersionToFiles(version, before);
 
