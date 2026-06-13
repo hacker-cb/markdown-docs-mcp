@@ -1,8 +1,9 @@
 name: release
 
-# Fires when a release tag is pushed to master. Use scripts/release.mjs locally
-# to produce the two-file version bump + tag; this workflow takes it from
-# there: re-run the full test matrix, build, then publish to npm via Trusted
+# Fires on any pushed `v*` release tag (the trigger does not constrain the
+# branch — by convention tags are cut on master via scripts/release.mjs, which
+# produces the two-file version bump + tag). This workflow takes it from there:
+# re-run the full test matrix, build, then publish to npm via Trusted
 # Publisher (OIDC, no NPM_TOKEN secret) and create a GitHub Release.
 
 on:
